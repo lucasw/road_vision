@@ -48,7 +48,7 @@ class RoadVision():
         while True:
             if self.l_button_down:
                 col = (255,0,0)
-                sz = 20
+                sz = 30
                 if (self.ox is not None and self.mx is not None):
                     cv2.line(self.overlay, (self.ox, self.oy),
                             (self.mx, self.my), col, sz)
@@ -56,7 +56,14 @@ class RoadVision():
                 self.oy = self.my
                 #print self.mx, self.my
                 #cv2.circle(self.overlay, (self.mx, self.my), sz, col, -1) 
-            cv2.imshow("image", self.overlay)
+            
+            # unmarked parts of overlay
+            black = self.overlay[:,:] == [0, 0, 0]
+            used = self.overlay[:,:] != [0, 0, 0]
+            comp = self.im
+            comp[used] = self.overlay[used]
+
+            cv2.imshow("image", comp)
             key = cv2.waitKey(5)
             #if key != -1:
             #    print key
