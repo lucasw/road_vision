@@ -3,10 +3,13 @@
 # load images of driving down a road, find different features -
 # the road, lane dividers, other cars, the sky, and unknown other stuff.
 
+# load images in data dir, 'j' and 'k' iterate forward or backward through them
+# road_vision$ ./scripts/road.py data
+
 import cv2
 import numpy as np
+import os
 import sys
-
 
 def get_mouse(event, x, y, flags, param):
     param.mx = x
@@ -27,25 +30,36 @@ def get_mouse(event, x, y, flags, param):
         print event, x, y
 
 
-name = sys.argv[1]
-
 class RoadVision():
     
-    def __init__(self, name):
+    def __init__(self, dir_name):
         self.ox = None
         self.oy = None
         self.mx = None
         self.my = None
         self.l_button_down = False
+        
+        self.images = {}
+        #for subdir, dirs, files in os.walk(name):
+        #    for fl in sorted(files):
+        for fl in sorted(os.listdir(dir_name)):
+                name = os.path.join(dir_name, fl)
+                im = cv2.imread(name)
+                if im is not None:
+                    print name
+                    self.images[name] = im
+            #self.im = cv2.imread(name)
+        
+        self.ind = 0
 
-        self.im = cv2.imread(name)
-        self.overlay = np.zeros(self.im.shape, np.uint8) 
+        #self.overlay = np.zeros(self.im.shape, np.uint8) 
 
         cv2.namedWindow("image")
         cv2.setMouseCallback('image', get_mouse, self)
 
     def spin(self):
-        while True:
+        if False:
+        #while True:
             if self.l_button_down:
                 col = (255,0,0)
                 sz = 30
@@ -64,9 +78,21 @@ class RoadVision():
             comp[used] = self.overlay[used]
 
             cv2.imshow("image", comp)
+
+        while True:
+            cv2.imshow("image", self.images[sorted(self.images.keys())[self.ind]])
             key = cv2.waitKey(5)
             #if key != -1:
             #    print key
+            num_keys = len(self.images.keys())
+            if key == ord('j'):
+                self.ind += 1
+                self.ind = self.ind % num_keys
+                #print self.ind, self.images.keys()[self.ind]
+            if key == ord('k'):
+                self.ind -= 1
+                self.ind = (self.ind + num_keys) % num_keys
+                #print self.ind, self.images.keys()[self.ind]
             if key == ord('q'):
                 break
 
