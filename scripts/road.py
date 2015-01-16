@@ -7,6 +7,7 @@
 # road_vision$ ./scripts/road.py data
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
@@ -48,14 +49,20 @@ class RoadVision():
                 if im is not None:
                     print name
                     self.images[name] = im
+
+                if len(self.images.keys()) > 10:
+                    break
             #self.im = cv2.imread(name)
         
         self.ind = 0
-
+        self.cy = 500
         #self.overlay = np.zeros(self.im.shape, np.uint8) 
 
         cv2.namedWindow("image")
         cv2.setMouseCallback('image', get_mouse, self)
+
+        plt.ion()
+        plt.show()
 
     def spin(self):
         if False:
@@ -80,20 +87,40 @@ class RoadVision():
             cv2.imshow("image", comp)
 
         while True:
-            cv2.imshow("image", self.images[sorted(self.images.keys())[self.ind]])
-            key = cv2.waitKey(5)
+            cur = self.images[sorted(self.images.keys())[self.ind]] #.copy()
+            
+            if (self.cy >= cur.shape[0]):
+                self.cy = self.cy % cur.shape[0]
+
+            plt.axis([0, cur.shape[1], 0, 255])
+            plt.clf()
+            plt.plot(cur[self.cy,:,0])
+            plt.draw()
+            plt.pause(0.01)
+
+            cur2 = cur.copy()
+            cur2[self.cy,:,0] = 255 # [255,0,100]
+            cv2.imshow("image", cur2)
+        
+            key = cv2.waitKey(0)
             #if key != -1:
             #    print key
             num_keys = len(self.images.keys())
-            if key == ord('j'):
+            if key == ord('d'):
+                self.cy += 1
+                self.cy = self.cy % cur.shape[0]
+            elif key == ord('f'):
+                self.cy -= 1
+                self.cy = (self.cy + cur.shape[0]) % cur.shape[0]
+            elif key == ord('j'):
                 self.ind += 1
                 self.ind = self.ind % num_keys
                 #print self.ind, self.images.keys()[self.ind]
-            if key == ord('k'):
+            elif key == ord('k'):
                 self.ind -= 1
                 self.ind = (self.ind + num_keys) % num_keys
                 #print self.ind, self.images.keys()[self.ind]
-            if key == ord('q'):
+            elif key == ord('q'):
                 break
 
 comment = '''
