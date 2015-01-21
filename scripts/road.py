@@ -40,6 +40,11 @@ class RoadVision():
         self.mx = None
         self.my = None
         self.l_button_down = False
+       
+        # currently in half height coords
+        # x1, y2, x2, y2
+        self.roi1 = ((530, 300), (630, 330))
+        self.roi2 = ((1150, 300), (1250, 330))
         
         self.images = {}
         #for subdir, dirs, files in os.walk(name):
@@ -115,8 +120,8 @@ class RoadVision():
                 poss_pts[y] = []
                 row = cur2[y,:].astype(int)
                 diff = row[1:] - row[:-1]
-                rises = diff >  16
-                drops = diff < -16
+                rises = diff >  10
+                drops = diff < -5
                 r2 = np.where(rises)[0]
                 d2 = np.where(drops)[0]
                 #print y, 'shape', rises.shape, r2, len(r2), np.sum(rises)
@@ -143,7 +148,9 @@ class RoadVision():
                 #print 'l', y, d2
                 #vis[y,highs,1] = 185 
                 #vis[y,lows,1:] = 185 
-
+            
+            cv2.rectangle(vis, self.roi1[0], self.roi1[1], (255,0,0), 2)
+            cv2.rectangle(vis, self.roi2[0], self.roi2[1], (255,0,0), 2)
             #cur2[self.cy,:,0] = 255 # [255,0,100]
             # hard coded masking out of sky, make algorithmic later TBD
             # should make this happen early to reduce resource usage
