@@ -4,6 +4,7 @@
 # the road, lane dividers, other cars, the sky, and unknown other stuff.
 
 # load images in data dir, 'j' and 'k' iterate forward or backward through them
+# 'd' and 'f' to move test line around
 # road_vision$ ./scripts/road.py data
 
 import cv2
@@ -55,7 +56,7 @@ class RoadVision():
             #self.im = cv2.imread(name)
         
         self.ind = 0
-        self.cy = 500
+        self.cy = None
         #self.overlay = np.zeros(self.im.shape, np.uint8) 
 
         cv2.namedWindow("image")
@@ -89,18 +90,56 @@ class RoadVision():
         while True:
             cur = self.images[sorted(self.images.keys())[self.ind]] #.copy()
             
+            if (self.cy == None):
+                self.cy = cur.shape[0] * 3 / 4
             if (self.cy >= cur.shape[0]):
                 self.cy = self.cy % cur.shape[0]
 
-            plt.axis([0, cur.shape[1], 0, 255])
             plt.clf()
-            plt.plot(cur[self.cy,:,0])
+            r = cur[self.cy,:,2].astype(int)
+            g = cur[self.cy,:,0].astype(int)
+            b = cur[self.cy,:,1].astype(int)
+            plt.plot(b[1:] - b[:-1], '.', ms=2.0)
+            plt.plot(g[1:] - g[:-1], '.', ms=2.0)
+            plt.plot(r[1:] - r[:-1], '.', ms=2.0)
+            #plt.axis([0, cur.shape[1], -40, 40])
             plt.draw()
             plt.pause(0.01)
 
-            cur2 = cur.copy()
-            cur2[self.cy,:,0] = 255 # [255,0,100]
-            cv2.imshow("image", cur2)
+            cur2 = cv2.cvtColor(cur[cur.shape[0]/2:,:], cv2.COLOR_BGR2GRAY)
+
+            vis = cv2.cvtColor(cur2, cv2.COLOR_GRAY2BGR)
+            poss_pts = {}
+            # look for lane markings
+            for y in range(cur2.shape[0]-1, 100, -10):
+                poss_pts[y] = []
+                row = cur2[y,:].astype(int)
+                diff = row[1:] - row[:-1]
+                rises = diff >  16
+                drops = diff < -16
+                r2 = np.where(rises)[0]
+                d2 = np.where(drops)[0]
+                #print y, 'shape', rises.shape, r2, len(r2), np.sum(rises)
+                for rise in r2:
+                    dr = rise - d2
+                    matches = np.where( np.logical_and(dr >= 0, dr < 20) )
+                    if len(matches) > 0:
+                        # start x and half width
+                        half_pt_x = rise + dr[matches[0]]/2
+                        poss_pts[y].append( (rise, half_pt_x) ) 
+                        vis[y,rise,0] = 255
+                        vis[y,rise,1] = 155
+                        vis[y,rise,2] = 0
+                #print 'h', y, r2
+                #print 'l', y, d2
+                #vis[y,highs,1] = 185 
+                #vis[y,lows,1:] = 185 
+
+            #cur2[self.cy,:,0] = 255 # [255,0,100]
+            # hard coded masking out of sky, make algorithmic later TBD
+            # should make this happen early to reduce resource usage
+            #cv2.imshow("image", cur2[:,1:,:]-cur2[:,:-1,:])
+            cv2.imshow("image", vis)
         
             key = cv2.waitKey(0)
             #if key != -1:
