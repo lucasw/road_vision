@@ -121,15 +121,24 @@ class RoadVision():
                 d2 = np.where(drops)[0]
                 #print y, 'shape', rises.shape, r2, len(r2), np.sum(rises)
                 for rise in r2:
-                    dr = rise - d2
-                    matches = np.where( np.logical_and(dr >= 0, dr < 20) )
+                    dr = d2 - rise
+                    matches = np.where( np.logical_and(dr >= 0, dr < 20) )[0]
                     if len(matches) > 0:
                         # start x and half width
                         half_pt_x = rise + dr[matches[0]]/2
+                        #print rise, half_pt_x, matches[0], matches, dr
                         poss_pts[y].append( (rise, half_pt_x) ) 
-                        vis[y,rise,0] = 255
-                        vis[y,rise,1] = 155
-                        vis[y,rise,2] = 0
+                        vis[y,rise:half_pt_x,0] = 255
+                        vis[y,rise:half_pt_x,1] = 155
+                        vis[y,rise:half_pt_x,2] = 0
+                        if y - 1 >= 0:
+                            vis[y-1,rise:half_pt_x,0] = 0
+                            vis[y-1,rise:half_pt_x,1] = 0
+                            vis[y-1,rise:half_pt_x,2] = 0
+                        if y + 1 < cur2.shape[0]:
+                            vis[y+1,rise:half_pt_x,0] = 0
+                            vis[y+1,rise:half_pt_x,1] = 0
+                            vis[y+1,rise:half_pt_x,2] = 0
                 #print 'h', y, r2
                 #print 'l', y, d2
                 #vis[y,highs,1] = 185 
