@@ -103,7 +103,36 @@ class RoadVision():
                 #print 'h', y, r2
                 #print 'l', y, d2
             return poss_pts
-
+    
+    def findLane(self, cur2, vis, roi, do_plot=True):
+            roi_im1 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
+            roi_pts1 = self.findLanePts(roi_im1, 
+                            vis[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]] )
+            keys = sorted(roi_pts1.keys())
+            x1 = [roi_pts1[y][0][0] + roi[0][0] for y in keys]
+            y1 = [y + self.roi1[0][1] for y in keys]
+            
+            if len(y1) > 2:
+                pf = np.polyfit(y1, x1, 1)
+                p1d = np.poly1d(pf)
+                 
+                if do_plot:
+                    plt.plot(x1,y1, '.')
+                    ystart = roi[0][1] - 150
+                    yend = roi[1][1] + 150
+                    yp = np.linspace(ystart, yend, yend - ystart)
+                    xp = p1d(yp)
+                    plt.plot(xp,yp)
+                    plt.gca().invert_yaxis()
+                    plt.draw()
+                    plt.pause(0.01)
+                    
+                    gi1 = np.logical_and(xp > 1, xp < vis.shape[1]) 
+                    gi2 = np.logical_and(yp > 1, yp < vis.shape[0]) 
+                    gi = np.logical_and(gi1, gi2)
+                    vis[yp[gi].astype(int), xp[gi].astype(int)-1, :] = 0
+                    vis[yp[gi].astype(int), xp[gi].astype(int), 0] = 250
+                    vis[yp[gi].astype(int), xp[gi].astype(int), 1] = 50
     def spin(self):
         if False:
         #while True:
@@ -150,23 +179,8 @@ class RoadVision():
             vis = cv2.cvtColor(cur2, cv2.COLOR_GRAY2BGR)
 
             #self.roi1 = ((530, 300), (630, 330))
-            roi = self.roi1
-            roi_im1 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
-            roi_pts1 = self.findLanePts(roi_im1, 
-                            vis[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]] )
-            keys = sorted(roi_pts1.keys())
-            x1 = [roi_pts1[y][0][0] + roi[0][0] for y in keys]
-            y1 = [y + self.roi1[0][1] for y in keys]
-            if len(y1) > 2:
-                pf = np.polyfit(y1, x1, 1)
-                p1d = np.poly1d(pf)
-                plt.plot(x1,y1, '.')
-                yp = np.linspace(roi[0][1]  - 20, roi[1][1] + 20, 50)
-                plt.plot(p1d(yp),yp)
-                plt.gca().invert_yaxis()
-                plt.draw()
-                plt.pause(0.01)
-    
+            self.findLane(cur2, vis, self.roi1)
+                
             roi = self.roi2
             roi_im2 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
             roi_pts2 = self.findLanePts(roi_im2, 
