@@ -69,7 +69,40 @@ class RoadVision():
 
         plt.ion()
         plt.show()
-
+    
+    def findLanePts(self, im, vis):
+            
+            poss_pts = {}
+            # look for lane markings
+            for y in range(im.shape[0]-1, 0, -1):
+                poss_pts[y] = []
+                row = im[y,:].astype(int)
+                diff = row[1:] - row[:-1]
+                rises = diff >  10
+                drops = diff < -5
+                r2 = np.where(rises)[0]
+                d2 = np.where(drops)[0]
+                #print y, 'shape', rises.shape, r2, len(r2), np.sum(rises)
+                for rise in r2:
+                    dr = d2 - rise
+                    matches = np.where( np.logical_and(dr >= 0, dr < 20) )[0]
+                    if len(matches) > 0:
+                        # start x and half width
+                        half_pt_x = rise + dr[matches[0]]/2
+                        #print rise, half_pt_x, matches[0], matches, dr
+                        poss_pts[y].append( (rise, half_pt_x) ) 
+                        vis[y,rise:half_pt_x,0] = 255
+                        vis[y,rise:half_pt_x,1] = 155
+                        vis[y,rise:half_pt_x,2] = 0
+                        if rise - 5 >= 0:
+                            vis[y,rise-5:rise,0] = 0
+                            vis[y,rise-5:rise,1] = 0
+                            vis[y,rise-5:rise,2] = 0
+                #print 'h', y, r2
+                #print 'l', y, d2
+                #vis[y,highs,1] = 185 
+                #vis[y,lows,1:] = 185 
+            
     def spin(self):
         if False:
         #while True:
@@ -114,41 +147,18 @@ class RoadVision():
             cur2 = cv2.cvtColor(cur[cur.shape[0]/2:,:], cv2.COLOR_BGR2GRAY)
 
             vis = cv2.cvtColor(cur2, cv2.COLOR_GRAY2BGR)
-            poss_pts = {}
-            # look for lane markings
-            for y in range(cur2.shape[0]-1, 100, -10):
-                poss_pts[y] = []
-                row = cur2[y,:].astype(int)
-                diff = row[1:] - row[:-1]
-                rises = diff >  10
-                drops = diff < -5
-                r2 = np.where(rises)[0]
-                d2 = np.where(drops)[0]
-                #print y, 'shape', rises.shape, r2, len(r2), np.sum(rises)
-                for rise in r2:
-                    dr = d2 - rise
-                    matches = np.where( np.logical_and(dr >= 0, dr < 20) )[0]
-                    if len(matches) > 0:
-                        # start x and half width
-                        half_pt_x = rise + dr[matches[0]]/2
-                        #print rise, half_pt_x, matches[0], matches, dr
-                        poss_pts[y].append( (rise, half_pt_x) ) 
-                        vis[y,rise:half_pt_x,0] = 255
-                        vis[y,rise:half_pt_x,1] = 155
-                        vis[y,rise:half_pt_x,2] = 0
-                        if y - 1 >= 0:
-                            vis[y-1,rise:half_pt_x,0] = 0
-                            vis[y-1,rise:half_pt_x,1] = 0
-                            vis[y-1,rise:half_pt_x,2] = 0
-                        if y + 1 < cur2.shape[0]:
-                            vis[y+1,rise:half_pt_x,0] = 0
-                            vis[y+1,rise:half_pt_x,1] = 0
-                            vis[y+1,rise:half_pt_x,2] = 0
-                #print 'h', y, r2
-                #print 'l', y, d2
-                #vis[y,highs,1] = 185 
-                #vis[y,lows,1:] = 185 
-            
+
+            #self.roi1 = ((530, 300), (630, 330))
+            roi = self.roi1
+            roi_im1 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
+            roi_pts = self.findLanePts(roi_im1, 
+                            vis[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]] )
+
+            roi = self.roi2
+            roi_im2 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
+            roi_pts = self.findLanePts(roi_im2, 
+                            vis[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]] )
+           
             cv2.rectangle(vis, self.roi1[0], self.roi1[1], (255,0,0), 2)
             cv2.rectangle(vis, self.roi2[0], self.roi2[1], (255,0,0), 2)
             #cur2[self.cy,:,0] = 255 # [255,0,100]
