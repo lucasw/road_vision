@@ -75,7 +75,6 @@ class RoadVision():
             poss_pts = {}
             # look for lane markings
             for y in range(im.shape[0]-1, 0, -1):
-                poss_pts[y] = []
                 row = im[y,:].astype(int)
                 diff = row[1:] - row[:-1]
                 rises = diff >  10
@@ -90,6 +89,9 @@ class RoadVision():
                         # start x and half width
                         half_pt_x = rise + dr[matches[0]]/2
                         #print rise, half_pt_x, matches[0], matches, dr
+                        if not y in poss_pts.keys():
+                            poss_pts[y] = []
+                            
                         poss_pts[y].append( (rise, half_pt_x) ) 
                         vis[y,rise:half_pt_x,0] = 255
                         vis[y,rise:half_pt_x,1] = 155
@@ -100,9 +102,8 @@ class RoadVision():
                             vis[y,rise-5:rise,2] = 0
                 #print 'h', y, r2
                 #print 'l', y, d2
-                #vis[y,highs,1] = 185 
-                #vis[y,lows,1:] = 185 
-            
+            return poss_pts
+
     def spin(self):
         if False:
         #while True:
@@ -137,12 +138,12 @@ class RoadVision():
             r = cur[self.cy,:,2].astype(int)
             g = cur[self.cy,:,0].astype(int)
             b = cur[self.cy,:,1].astype(int)
-            plt.plot(b[1:] - b[:-1], '.', ms=2.0)
-            plt.plot(g[1:] - g[:-1], '.', ms=2.0)
-            plt.plot(r[1:] - r[:-1], '.', ms=2.0)
+            #plt.plot(b[1:] - b[:-1], '.', ms=2.0)
+            #plt.plot(g[1:] - g[:-1], '.', ms=2.0)
+            #plt.plot(r[1:] - r[:-1], '.', ms=2.0)
             #plt.axis([0, cur.shape[1], -40, 40])
-            plt.draw()
-            plt.pause(0.01)
+            #plt.draw()
+            #plt.pause(0.01)
 
             cur2 = cv2.cvtColor(cur[cur.shape[0]/2:,:], cv2.COLOR_BGR2GRAY)
 
@@ -151,12 +152,24 @@ class RoadVision():
             #self.roi1 = ((530, 300), (630, 330))
             roi = self.roi1
             roi_im1 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
-            roi_pts = self.findLanePts(roi_im1, 
+            roi_pts1 = self.findLanePts(roi_im1, 
                             vis[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]] )
-
+            keys = sorted(roi_pts1.keys())
+            x1 = [roi_pts1[y][0][0] + roi[0][0] for y in keys]
+            y1 = [y + self.roi1[0][1] for y in keys]
+            if len(y1) > 2:
+                pf = np.polyfit(y1, x1, 1)
+                p1d = np.poly1d(pf)
+                plt.plot(x1,y1, '.')
+                yp = np.linspace(roi[0][1]  - 20, roi[1][1] + 20, 50)
+                plt.plot(p1d(yp),yp)
+                plt.gca().invert_yaxis()
+                plt.draw()
+                plt.pause(0.01)
+    
             roi = self.roi2
             roi_im2 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
-            roi_pts = self.findLanePts(roi_im2, 
+            roi_pts2 = self.findLanePts(roi_im2, 
                             vis[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]] )
            
             cv2.rectangle(vis, self.roi1[0], self.roi1[1], (255,0,0), 2)
