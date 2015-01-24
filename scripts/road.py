@@ -104,35 +104,76 @@ class RoadVision():
                 #print 'l', y, d2
             return poss_pts
     
-    def findLane(self, cur2, vis, roi, do_plot=True):
+    def findLane(self, cur2, vis, init_roi, do_plot=True):
+        roi = init_roi
+        lane_x = []
+        lane_y = []
+        yend   = roi[1][1]
+        
+        step = 10
+        count = 0
+        while True:
+
             roi_im1 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
             roi_pts1 = self.findLanePts(roi_im1, 
                             vis[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]] )
+            print roi
+            cv2.rectangle(vis, roi[0], roi[1], (255,0,0), 1)
+
             keys = sorted(roi_pts1.keys())
             x1 = [roi_pts1[y][0][0] + roi[0][0] for y in keys]
-            y1 = [y + self.roi1[0][1] for y in keys]
+            y1 = [y + roi[0][1] for y in keys]
             
-            if len(y1) > 2:
-                pf = np.polyfit(y1, x1, 1)
+            lane_x.extend(x1)
+            lane_y.extend(y1)
+            #print lane_x
+            #print lane_y
+
+            ystart   = roi[0][1] - step
+            yp = np.linspace(ystart, yend, yend - ystart)
+            xp = None
+            if len(lane_y) > 2:
+                pf = np.polyfit(lane_y, lane_x, 1)
                 p1d = np.poly1d(pf)
                  
-                if do_plot:
-                    plt.plot(x1,y1, '.')
-                    ystart = roi[0][1] - 150
-                    yend = roi[1][1] + 150
-                    yp = np.linspace(ystart, yend, yend - ystart)
+                #if do_plot:
+                if True:
                     xp = p1d(yp)
-                    plt.plot(xp,yp)
-                    plt.gca().invert_yaxis()
-                    plt.draw()
-                    plt.pause(0.01)
-                    
-                    gi1 = np.logical_and(xp > 1, xp < vis.shape[1]) 
-                    gi2 = np.logical_and(yp > 1, yp < vis.shape[0]) 
-                    gi = np.logical_and(gi1, gi2)
-                    vis[yp[gi].astype(int), xp[gi].astype(int)-1, :] = 0
-                    vis[yp[gi].astype(int), xp[gi].astype(int), 0] = 250
-                    vis[yp[gi].astype(int), xp[gi].astype(int), 1] = 50
+                    p1 = ( int(xp[0]), int(yp[0]) )
+                    p2 = ( int(xp[-1]), int(yp[-1]) )
+                    cv2.line(vis, p1, p2, (count*5,50,255 - count * 2))
+
+                    if False:
+                        plt.plot(x1,y1, '.')
+                        plt.plot(xp,yp)
+                    if False: 
+                        gi1 = np.logical_and(xp > 1, xp < vis.shape[1]) 
+                        gi2 = np.logical_and(yp > 1, yp < vis.shape[0]) 
+                        gi = np.logical_and(gi1, gi2)
+                        vis[yp[gi].astype(int), xp[gi].astype(int)-1, :] = 0
+                        vis[yp[gi].astype(int), xp[gi].astype(int), 0] = 250
+                        vis[yp[gi].astype(int), xp[gi].astype(int), 1] = 50
+                        
+            # new roi
+            count +=1 
+            if count > 20:
+                break
+            if ystart < 0: 
+                break
+            if xp is not None and len(xp) >= step: 
+                roi = ((int(np.amin(xp[:step]) - 20), ystart), 
+                       (int(np.amax(xp[:step]) + 20), ystart + step))
+            else:
+                roi = ((roi[0][0] - 2, ystart), 
+                       (roi[1][0] + 2, ystart + step))
+       
+        if False:
+            plt.xlabel('x')
+            plt.ylabel('y')
+            plt.gca().invert_yaxis()
+            plt.draw()
+            plt.pause(0.01)
+
     def spin(self):
         if False:
         #while True:
@@ -178,16 +219,10 @@ class RoadVision():
 
             vis = cv2.cvtColor(cur2, cv2.COLOR_GRAY2BGR)
 
-            #self.roi1 = ((530, 300), (630, 330))
-            self.findLane(cur2, vis, self.roi1)
+            #self.findLane(cur2, vis, self.roi1)
+            self.findLane(cur2, vis, self.roi2)
                 
-            roi = self.roi2
-            roi_im2 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
-            roi_pts2 = self.findLanePts(roi_im2, 
-                            vis[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]] )
            
-            cv2.rectangle(vis, self.roi1[0], self.roi1[1], (255,0,0), 2)
-            cv2.rectangle(vis, self.roi2[0], self.roi2[1], (255,0,0), 2)
             #cur2[self.cy,:,0] = 255 # [255,0,100]
             # hard coded masking out of sky, make algorithmic later TBD
             # should make this happen early to reduce resource usage
@@ -212,6 +247,8 @@ class RoadVision():
                 self.ind -= 1
                 self.ind = (self.ind + num_keys) % num_keys
                 #print self.ind, self.images.keys()[self.ind]
+            elif key == ord('s'):
+                cv2.imwrite("test.png", vis)
             elif key == ord('q'):
                 break
 
