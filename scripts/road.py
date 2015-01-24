@@ -40,12 +40,18 @@ class RoadVision():
         self.mx = None
         self.my = None
         self.l_button_down = False
-       
+        
+        self.p1d = {}
+
         # currently in half height coords
         # x1, y2, x2, y2
-        self.roi1 = ((530, 300), (630, 330))
-        self.roi2 = ((1150, 300), (1250, 330))
-        
+        self.roi = {}
+        self.roi["left"] = ((370, 360), (570, 390))
+        self.roi["right"] = ((1200, 360), (1400, 390))
+
+        for k in self.roi.keys():
+            self.p1d[k] = None
+
         self.images = {}
         #for subdir, dirs, files in os.walk(name):
         #    for fl in sorted(files):
@@ -105,7 +111,7 @@ class RoadVision():
                 #print 'l', y, d2
             return poss_pts
     
-    def findLane(self, cur2, vis, init_roi, do_plot=True):
+    def findLane(self, name, cur2, vis, init_roi, do_plot=True):
         roi = init_roi
         lane_x = []
         lane_y = []
@@ -113,6 +119,7 @@ class RoadVision():
         
         step = 10
         count = 0
+        p1d = None
         while True:
 
             roi_im1 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
@@ -133,10 +140,14 @@ class RoadVision():
             ystart   = roi[0][1] - step
             yp = np.linspace(ystart, yend, yend - ystart)
             xp = None
-            if len(lane_y) > 2:
+            if len(lane_y) > 4:
                 pf = np.polyfit(lane_y, lane_x, 1)
                 p1d = np.poly1d(pf)
-                 
+            else:
+                
+                p1d = self.p1d[name]
+            
+            if p1d is not None:
                 #if do_plot:
                 if True:
                     xp = p1d(yp)
@@ -154,20 +165,27 @@ class RoadVision():
                         vis[yp[gi].astype(int), xp[gi].astype(int)-1, :] = 0
                         vis[yp[gi].astype(int), xp[gi].astype(int), 0] = 250
                         vis[yp[gi].astype(int), xp[gi].astype(int), 1] = 50
-                        
+            
             # new roi
             count +=1 
-            if count > 20:
+            if count > 24:
                 break
             if ystart < 0: 
                 break
-            if xp is not None and len(xp) >= step: 
-                roi = ((int(np.amin(xp[:step]) - 20), ystart), 
-                       (int(np.amax(xp[:step]) + 20), ystart + step))
+            if xp is not None and len(xp) >= step:
+                pad = step * 6 - count * 2
+                roi = ((int(np.amin(xp[:step]) - pad), ystart), 
+                       (int(np.amax(xp[:step]) + pad), ystart + step))
             else:
                 roi = ((roi[0][0] - 2, ystart), 
                        (roi[1][0] + 2, ystart + step))
        
+        print name, 'num_pts', len(lane_x)
+        if len(lane_x) > len(xp)/3:
+            if (self.p1d[name] is None):
+                print name, 'locking on', p1d
+            self.p1d[name] = p1d
+            # don't save the current polyfit
         if False:
             plt.xlabel('x')
             plt.ylabel('y')
@@ -219,9 +237,9 @@ class RoadVision():
             cur2 = cv2.cvtColor(cur[cur.shape[0]/2:,:], cv2.COLOR_BGR2GRAY)
 
             vis = cv2.cvtColor(cur2, cv2.COLOR_GRAY2BGR)
-
-            self.findLane(cur2, vis, self.roi1)
-            self.findLane(cur2, vis, self.roi2)
+            
+            for k in self.roi.keys():
+                self.findLane(k, cur2, vis, self.roi[k])
            
             #cur2[self.cy,:,0] = 255 # [255,0,100]
             # hard coded masking out of sky, make algorithmic later TBD
