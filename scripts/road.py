@@ -56,10 +56,11 @@ class RoadVision():
                     print name
                     self.images[name] = im
 
-                if len(self.images.keys()) > 10:
+                if len(self.images.keys()) > 20:
                     break
             #self.im = cv2.imread(name)
         
+        print 'loaded ', len(self.images.keys()), 'images'
         self.ind = 0
         self.cy = None
         #self.overlay = np.zeros(self.im.shape, np.uint8) 
@@ -117,7 +118,7 @@ class RoadVision():
             roi_im1 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
             roi_pts1 = self.findLanePts(roi_im1, 
                             vis[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]] )
-            print roi
+            #print roi
             cv2.rectangle(vis, roi[0], roi[1], (255,0,0), 1)
 
             keys = sorted(roi_pts1.keys())
@@ -219,9 +220,8 @@ class RoadVision():
 
             vis = cv2.cvtColor(cur2, cv2.COLOR_GRAY2BGR)
 
-            #self.findLane(cur2, vis, self.roi1)
+            self.findLane(cur2, vis, self.roi1)
             self.findLane(cur2, vis, self.roi2)
-                
            
             #cur2[self.cy,:,0] = 255 # [255,0,100]
             # hard coded masking out of sky, make algorithmic later TBD
