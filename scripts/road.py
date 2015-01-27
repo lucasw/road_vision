@@ -5,7 +5,8 @@
 
 # load images in data dir, 'j' and 'k' iterate forward or backward through them
 # 'd' and 'f' to move test line around
-# road_vision$ ./scripts/road.py data
+# #road_vision$ ./scripts/road.py data
+# road_vision$ ./scripts/road.py data/raw/video.mov
 
 import cv2
 import matplotlib.pyplot as plt
@@ -46,12 +47,28 @@ class RoadVision():
         # currently in half height coords
         # x1, y2, x2, y2
         self.roi = {}
-        self.roi["left"] = ((370, 360), (570, 390))
-        self.roi["right"] = ((1200, 360), (1400, 390))
+        #self.roi["left"] = ((370, 360), (570, 390))
+        #self.roi["right"] = ((1200, 360), (1400, 390))
+        self.roi["left"] = ((370, 360), (770, 390))
+        #self.roi["right"] = ((1200, 360), (1600, 390))
 
         for k in self.roi.keys():
             self.p1d[k] = None
 
+        self.cap = cv2.VideoCapture(dir_name)
+        ret, self.cur = self.cap.read()
+
+        cv2.namedWindow("image")
+        self.cy = None
+        self.ind = 0
+        cv2.setMouseCallback('image', get_mouse, self)
+
+        plt.ion()
+        plt.show()
+    
+        return
+
+        ##############################################
         self.images = {}
         #for subdir, dirs, files in os.walk(name):
         #    for fl in sorted(files):
@@ -67,15 +84,8 @@ class RoadVision():
             #self.im = cv2.imread(name)
         
         print 'loaded ', len(self.images.keys()), 'images'
-        self.ind = 0
-        self.cy = None
         #self.overlay = np.zeros(self.im.shape, np.uint8) 
 
-        cv2.namedWindow("image")
-        cv2.setMouseCallback('image', get_mouse, self)
-
-        plt.ion()
-        plt.show()
     
     def findLanePts(self, im, vis):
             
@@ -84,31 +94,54 @@ class RoadVision():
             for y in range(im.shape[0]-1, 0, -1):
                 row = im[y,:].astype(int)
                 diff = row[1:] - row[:-1]
-                rises = diff >  10
+                rises = diff >  12
                 drops = diff < -5
                 r2 = np.where(rises)[0]
                 d2 = np.where(drops)[0]
                 #print y, 'shape', rises.shape, r2, len(r2), np.sum(rises)
+                new_pts = []
                 for rise in r2:
                     dr = d2 - rise
-                    matches = np.where( np.logical_and(dr >= 0, dr < 20) )[0]
-                    if len(matches) > 0:
+                    matches = np.where( np.logical_and(dr >= 0, dr < 40) )[0]
+                    for match in matches: #if len(matches) > 0:
                         # start x and half width
-                        half_pt_x = rise + dr[matches[0]]/2
+                        half_pt_x = rise + dr[match]/2
+                        #if row[half_pt_x] < 70:
+                        #    continue
                         #print rise, half_pt_x, matches[0], matches, dr
-                        if not y in poss_pts.keys():
-                            poss_pts[y] = []
+                        
+                        #if not y in poss_pts.keys():
+                        #    poss_pts[y] = []
                             
-                        poss_pts[y].append( (rise, half_pt_x) ) 
-                        vis[y,rise:half_pt_x,0] = 255
-                        vis[y,rise:half_pt_x,1] = 155
-                        vis[y,rise:half_pt_x,2] = 0
-                        if rise - 5 >= 0:
-                            vis[y,rise-5:rise,0] = 0
-                            vis[y,rise-5:rise,1] = 0
-                            vis[y,rise-5:rise,2] = 0
+                        new_pts.append( (rise, half_pt_x, row[half_pt_x]) ) 
+                       
+                        #break
                 #print 'h', y, r2
                 #print 'l', y, d2
+
+                # only take the best half of the points:
+                if len(new_pts) > 5:
+                    quality = sorted([a[2] for a in new_pts])
+               
+                    med_qual = quality[3*len(quality)/5]
+                    #print 'med quality', med_qual 
+                    for pt in new_pts:
+                        if pt[2] > med_qual:
+                            if not y in poss_pts.keys():
+                                poss_pts[y] = []
+                            poss_pts[y].append(pt)
+                            
+                            rise = pt[0]
+                            half_pt_x = pt[1]
+                            vis[y,rise:half_pt_x,0] = 255
+                            vis[y,rise:half_pt_x,1] = 155
+                            vis[y,rise:half_pt_x,2] = pt[2]
+                            if rise - 5 >= 0:
+                                vis[y,rise-5:rise,0] = 0
+                                vis[y,rise-5:rise,1] = 0
+                                vis[y,rise-5:rise,2] = 0
+                         
+
             return poss_pts
     
     def findLane(self, name, cur2, vis, init_roi, do_plot=True):
@@ -117,6 +150,7 @@ class RoadVision():
         lane_y = []
         yend   = roi[1][1]
         
+        xp = None
         step = 10
         count = 0
         p1d = None
@@ -132,19 +166,28 @@ class RoadVision():
             x1 = [roi_pts1[y][0][0] + roi[0][0] for y in keys]
             y1 = [y + roi[0][1] for y in keys]
             
-            lane_x.extend(x1)
-            lane_y.extend(y1)
+            test_lane_x = lane_x[:]
+            test_lane_y = lane_y[:]
+            test_lane_x.extend(x1)
+            test_lane_y.extend(y1)
             #print lane_x
             #print lane_y
 
             ystart   = roi[0][1] - step
             yp = np.linspace(ystart, yend, yend - ystart)
             xp = None
+            if len(test_lane_y) > 4:
+                pf, residuals, rank, singular_values, rcond = np.polyfit(test_lane_y, test_lane_x, 2, full=True)
+                print count, 'resid', residuals[0], len(lane_x)
+                if residuals[0] < 500:
+                    lane_x = test_lane_x
+                    lane_y = test_lane_y
+                
             if len(lane_y) > 4:
-                pf = np.polyfit(lane_y, lane_x, 1)
+                # TBD possible redundant polyfit
+                pf = np.polyfit(lane_y, lane_x, 2)
                 p1d = np.poly1d(pf)
             else:
-                
                 p1d = self.p1d[name]
             
             if p1d is not None:
@@ -179,13 +222,15 @@ class RoadVision():
             else:
                 roi = ((roi[0][0] - 2, ystart), 
                        (roi[1][0] + 2, ystart + step))
+      
        
-        print name, 'num_pts', len(lane_x)
-        if len(lane_x) > len(xp)/3:
-            if (self.p1d[name] is None):
+        if xp is not None:
+            #print name, 'num_pts', len(lane_x)
+            # save the current polyfit
+            if len(lane_x) > len(xp)/3:
+                #if (self.p1d[name] is None):
                 print name, 'locking on', p1d
-            self.p1d[name] = p1d
-            # don't save the current polyfit
+                self.p1d[name] = p1d
         if False:
             plt.xlabel('x')
             plt.ylabel('y')
@@ -216,8 +261,11 @@ class RoadVision():
             cv2.imshow("image", comp)
 
         while True:
-            cur = self.images[sorted(self.images.keys())[self.ind]] #.copy()
-            
+            cur = self.cur #self.images[sorted(self.images.keys())[self.ind]] #.copy()
+            if cur is None:
+                continue
+
+
             if (self.cy == None):
                 self.cy = cur.shape[0] * 3 / 4
             if (self.cy >= cur.shape[0]):
@@ -234,39 +282,51 @@ class RoadVision():
             #plt.draw()
             #plt.pause(0.01)
 
-            cur2 = cv2.cvtColor(cur[cur.shape[0]/2:,:], cv2.COLOR_BGR2GRAY)
+            # hard coded masking out of sky, make algorithmic later TBD
+            # should make this happen early to reduce resource usage
+            cur2 = cv2.cvtColor(cur[cur.shape[0]/2 - 100:-100,:], cv2.COLOR_BGR2GRAY)
 
             vis = cv2.cvtColor(cur2, cv2.COLOR_GRAY2BGR)
             
             for k in self.roi.keys():
                 self.findLane(k, cur2, vis, self.roi[k])
            
-            #cur2[self.cy,:,0] = 255 # [255,0,100]
-            # hard coded masking out of sky, make algorithmic later TBD
-            # should make this happen early to reduce resource usage
-            #cv2.imshow("image", cur2[:,1:,:]-cur2[:,:-1,:])
             cv2.imshow("image", vis)
         
             key = cv2.waitKey(0)
             #if key != -1:
             #    print key
-            num_keys = len(self.images.keys())
-            if key == ord('d'):
-                self.cy += 1
-                self.cy = self.cy % cur.shape[0]
-            elif key == ord('f'):
-                self.cy -= 1
-                self.cy = (self.cy + cur.shape[0]) % cur.shape[0]
-            elif key == ord('j'):
-                self.ind += 1
-                self.ind = self.ind % num_keys
-                #print self.ind, self.images.keys()[self.ind]
-            elif key == ord('k'):
-                self.ind -= 1
-                self.ind = (self.ind + num_keys) % num_keys
-                #print self.ind, self.images.keys()[self.ind]
+            num_keys = 1 #len(self.images.keys())
+            if False:
+                if key == ord('d'):
+                    self.cy += 1
+                    self.cy = self.cy % cur.shape[0]
+                elif key == ord('f'):
+                    self.cy -= 1
+                    self.cy = (self.cy + cur.shape[0]) % cur.shape[0]
+                elif key == ord('j'):
+                    self.ind += 1
+                    self.ind = self.ind % num_keys
+                    #print self.ind, self.images.keys()[self.ind]
+                elif key == ord('k'):
+                    self.ind -= 1
+                    self.ind = (self.ind + num_keys) % num_keys
+                    #print self.ind, self.images.keys()[self.ind]
+            
+                if key == ord('d'):
+                    for k in self.roi.keys():
+                        for i in range(2):
+                            self.roi[k][i][1] -= 4
+                if key == ord('f'):
+                    for k in self.roi.keys():
+                        for i in range(2):
+                            self.roi[k][i][1] += 4
+
+            elif key == ord('n'):
+                ret, self.cur = self.cap.read()
             elif key == ord('s'):
                 cv2.imwrite("test.png", vis)
+                cv2.imwrite("raw.png", self.cur)
             elif key == ord('q'):
                 break
 
