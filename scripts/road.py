@@ -8,6 +8,7 @@
 # #road_vision$ ./scripts/road.py data
 # road_vision$ ./scripts/road.py data/raw/video.mov
 
+import cv
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -50,11 +51,15 @@ class RoadVision():
         #self.roi["left"] = ((370, 360), (570, 390))
         #self.roi["right"] = ((1200, 360), (1400, 390))
         self.roi["left"] = ((370, 360), (770, 390))
-        #self.roi["right"] = ((1200, 360), (1600, 390))
+        self.roi["right"] = ((1200, 360), (1600, 390))
 
         for k in self.roi.keys():
             self.p1d[k] = None
+        
+        #self.fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        #self.fourcc = cv2.VideoWriter_fourcc(*'XVID')
 
+        self.out_vid = None
         self.cap = cv2.VideoCapture(dir_name)
         ret, self.cur = self.cap.read()
 
@@ -144,6 +149,9 @@ class RoadVision():
 
             return poss_pts
     
+    # TBD need to have a function to take an polyfit and find lane with it
+    # without using any of the new data- this would allow comparing the old fit
+    # to the new, and use the old if it is a lot better.
     def findLane(self, name, cur2, vis, init_roi, do_plot=True):
         roi = init_roi
         lane_x = []
@@ -176,16 +184,17 @@ class RoadVision():
             ystart   = roi[0][1] - step
             yp = np.linspace(ystart, yend, yend - ystart)
             xp = None
+            order = 1
             if len(test_lane_y) > 4:
-                pf, residuals, rank, singular_values, rcond = np.polyfit(test_lane_y, test_lane_x, 2, full=True)
-                print count, 'resid', residuals[0], len(lane_x)
+                pf, residuals, rank, singular_values, rcond = np.polyfit(test_lane_y, test_lane_x, order, full=True)
+                #print count, 'resid', residuals[0], len(lane_x)
                 if residuals[0] < 500:
                     lane_x = test_lane_x
                     lane_y = test_lane_y
                 
             if len(lane_y) > 4:
                 # TBD possible redundant polyfit
-                pf = np.polyfit(lane_y, lane_x, 2)
+                pf = np.polyfit(lane_y, lane_x, order)
                 p1d = np.poly1d(pf)
             else:
                 p1d = self.p1d[name]
@@ -259,6 +268,8 @@ class RoadVision():
             comp[used] = self.overlay[used]
 
             cv2.imshow("image", comp)
+        
+        ind = 0
 
         while True:
             cur = self.cur #self.images[sorted(self.images.keys())[self.ind]] #.copy()
@@ -287,13 +298,20 @@ class RoadVision():
             cur2 = cv2.cvtColor(cur[cur.shape[0]/2 - 100:-100,:], cv2.COLOR_BGR2GRAY)
 
             vis = cv2.cvtColor(cur2, cv2.COLOR_GRAY2BGR)
-            
+            #if self.out_vid is None:
+                #fourcc =  cv.CV_FOURCC(*'DIVX') #('P','I','M','1')
+                #self.out_vid = cv2.VideoWriter('test.avi', fourcc, 30.0, (vis.shape[0],vis.shape[1]))
+
             for k in self.roi.keys():
                 self.findLane(k, cur2, vis, self.roi[k])
-           
+         
+            if self.out_vid:
+                self.out_vid.write(vis)
+            name = "image" + str(100000+ ind) + ".jpg"
+            cv2.imwrite(name, vis)
             cv2.imshow("image", vis)
         
-            key = cv2.waitKey(0)
+            key = cv2.waitKey(5)
             #if key != -1:
             #    print key
             num_keys = 1 #len(self.images.keys())
@@ -322,13 +340,18 @@ class RoadVision():
                         for i in range(2):
                             self.roi[k][i][1] += 4
 
-            elif key == ord('n'):
-                ret, self.cur = self.cap.read()
+            #elif key == ord('n'):
+            #    ret, self.cur = self.cap.read()
             elif key == ord('s'):
                 cv2.imwrite("test.png", vis)
                 cv2.imwrite("raw.png", self.cur)
             elif key == ord('q'):
+                if self.out_vid:
+                    self.out_vid.release();
                 break
+
+            ret, self.cur = self.cap.read()
+            ind += 1
 
 comment = '''
 >>> import cv2
