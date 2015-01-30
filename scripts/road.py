@@ -111,7 +111,10 @@ class Lane():
     # without using any of the new data- this would allow comparing the old fit
     # to the new, and use the old if it is a lot better.
     def findLane(self, cur2, vis, do_plot=True):
-        roi = self.init_roi
+        if 0 in self.rois.keys():
+            roi = self.rois[0]
+        else:
+            roi = self.init_roi
         lane_x = []
         lane_y = []
         yend   = roi[1][1]
@@ -145,10 +148,14 @@ class Lane():
             yp = np.linspace(ystart, yend, yend - ystart)
             xp = None
             order = 1
+            error = None
+            if count > 10:
+                order = 2
             if len(test_lane_y) > 4:
                 pf, residuals, rank, singular_values, rcond = \
                         np.polyfit(test_lane_y, test_lane_x, order, full=True)
                 #print count, 'resid', residuals[0], len(lane_x)
+                error = residuals[0]
                 if residuals[0] < 500:
                     lane_x = test_lane_x
                     lane_y = test_lane_y
@@ -163,21 +170,24 @@ class Lane():
             if p1d is not None:
                 #if do_plot:
                 if True:
+                    
                     xp = p1d(yp)
-                    p1 = ( int(xp[0]), int(yp[0]) )
-                    p2 = ( int(xp[-1]), int(yp[-1]) )
-                    cv2.line(vis, p1, p2, (count*5,50,255 - count * 2))
+                    if False:
+                        p1 = ( int(xp[0]), int(yp[0]) )
+                        p2 = ( int(xp[-1]), int(yp[-1]) )
+                        cv2.line(vis, p1, p2, (count*5,50,255 - count * 2))
 
                     if False:
                         plt.plot(x1,y1, '.')
                         plt.plot(xp,yp)
-                    if False: 
+                    if False: #error is not None and error < 1.0:
+                        print error
                         gi1 = np.logical_and(xp > 1, xp < vis.shape[1]) 
                         gi2 = np.logical_and(yp > 1, yp < vis.shape[0]) 
                         gi = np.logical_and(gi1, gi2)
                         vis[yp[gi].astype(int), xp[gi].astype(int)-1, :] = 0
-                        vis[yp[gi].astype(int), xp[gi].astype(int), 0] = 250
-                        vis[yp[gi].astype(int), xp[gi].astype(int), 1] = 50
+                        vis[yp[gi].astype(int), xp[gi].astype(int), 0] = 50
+                        vis[yp[gi].astype(int), xp[gi].astype(int), 1] = 250
             
             # new roi
             count += 1 
@@ -200,18 +210,18 @@ class Lane():
             # save the current polyfit
             if len(lane_x) > len(xp)/3:
                 #if (self.p1d[name] is None):
-                print self.name, 'locking on', p1d
+                print self.name, 'locking on' #, p1d
                 self.p1d  = p1d
                 self.lane_x = lane_x
                 self.lane_y = lane_y
                 self.xp = xp
                 self.yp = yp
                 c2 = 0
-                pad = 30
                 for y in np.arange(np.amax(yp) - 10, np.amin(yp), -10, np.int32):
                     xrng = xp[ np.logical_and(yp > y, yp < y + 10) ]
                     xmin = int(np.amin(xrng))
                     xmax = int(np.amax(xrng))
+                    pad = int((step * 6 - c2 * 2) * 1.5)
                     new_roi = ((xmin - pad, y),  (xmax + pad, y + 10))
                     #print c2, self.name, new_roi
                     self.rois[c2] = new_roi 
@@ -242,7 +252,7 @@ class RoadVision():
         # x1, y2, x2, y2
         self.lane = {}
         self.lane["left"]  = Lane("left", ((370, 360), (770, 390)))
-        #self.lane["right"] = Lane("right", ((1200, 360), (1600, 390)))
+        self.lane["right"] = Lane("right", ((1200, 360), (1600, 390)))
 
         #self.fourcc = cv2.VideoWriter_fourcc(*'XVID')
 
@@ -353,8 +363,8 @@ class RoadVision():
                 key = cv2.waitKey(5)
                 ret, self.cur = self.cap.read()
             else: 
-                key = cv2.waitKey(0)
-                if key == ord('n'):
+                key = cv2.waitKey(5)
+                if True: #if key == ord('n'):
                     ret, self.cur = self.cap.read()
                 elif key == ord('q'):
                     break
