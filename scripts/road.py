@@ -112,12 +112,14 @@ class Lane():
         lane_y = []
         yend   = roi[1][1]
         
+        rois = {}
+
         xp = None
         step = 10
         count = 0
         p1d = None
         while True:
-
+            rois[count] = roi 
             roi_im1 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
             roi_pts1 = self.findLanePts(roi_im1, 
                             vis[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]] )
@@ -173,19 +175,20 @@ class Lane():
                         vis[yp[gi].astype(int), xp[gi].astype(int), 1] = 50
             
             # new roi
-            count +=1 
+            count += 1 
             if count > 24:
                 break
             if ystart < 0: 
                 break
-            if xp is not None and len(xp) >= step:
+            if self.rois is not None and count in self.rois.keys():
+                roi = self.rois[count]
+            elif xp is not None and len(xp) >= step:
                 pad = step * 6 - count * 2
                 roi = ((int(np.amin(xp[:step]) - pad), ystart), 
                        (int(np.amax(xp[:step]) + pad), ystart + step))
             else:
                 roi = ((roi[0][0] - 2, ystart), 
                        (roi[1][0] + 2, ystart + step))
-      
        
         if xp is not None:
             #print name, 'num_pts', len(lane_x)
@@ -193,7 +196,8 @@ class Lane():
             if len(lane_x) > len(xp)/3:
                 #if (self.p1d[name] is None):
                 print self.name, 'locking on', p1d
-                self.p1d = p1d
+                self.p1d  = p1d
+                self.rois = rois
         if False:
             plt.xlabel('x')
             plt.ylabel('y')
@@ -232,7 +236,7 @@ class RoadVision():
         cv2.namedWindow("image")
         self.cy = None
         self.ind = 0
-        cv2.setMouseCallback('image', get_mouse, self)
+        #cv2.setMouseCallback('image', get_mouse, self)
 
         plt.ion()
         plt.show()
