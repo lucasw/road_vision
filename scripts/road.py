@@ -33,65 +33,19 @@ def get_mouse(event, x, y, flags, param):
     if do_print:
         print event, x, y
 
-
-class RoadVision():
+# store persistent data for a single lane
+# initial roi and rois from the best most recent lane match
+class Lane():
     
-    def __init__(self, dir_name):
-        self.ox = None
-        self.oy = None
-        self.mx = None
-        self.my = None
-        self.l_button_down = False
-        
-        self.p1d = {}
+    def __init__(self, name, roi):
+            
+        self.name = name
+        self.init_roi = roi
+        # all the rois continuing into distance, following the lane marker
+        self.rois = {}
+        # the polyfit class
+        self.p1d = None
 
-        # currently in half height coords
-        # x1, y2, x2, y2
-        self.roi = {}
-        #self.roi["left"] = ((370, 360), (570, 390))
-        #self.roi["right"] = ((1200, 360), (1400, 390))
-        self.roi["left"] = ((370, 360), (770, 390))
-        self.roi["right"] = ((1200, 360), (1600, 390))
-
-        for k in self.roi.keys():
-            self.p1d[k] = None
-        
-        #self.fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        #self.fourcc = cv2.VideoWriter_fourcc(*'XVID')
-
-        self.out_vid = None
-        self.cap = cv2.VideoCapture(dir_name)
-        ret, self.cur = self.cap.read()
-
-        cv2.namedWindow("image")
-        self.cy = None
-        self.ind = 0
-        cv2.setMouseCallback('image', get_mouse, self)
-
-        plt.ion()
-        plt.show()
-    
-        return
-
-        ##############################################
-        self.images = {}
-        #for subdir, dirs, files in os.walk(name):
-        #    for fl in sorted(files):
-        for fl in sorted(os.listdir(dir_name)):
-                name = os.path.join(dir_name, fl)
-                im = cv2.imread(name)
-                if im is not None:
-                    print name
-                    self.images[name] = im
-
-                if len(self.images.keys()) > 20:
-                    break
-            #self.im = cv2.imread(name)
-        
-        print 'loaded ', len(self.images.keys()), 'images'
-        #self.overlay = np.zeros(self.im.shape, np.uint8) 
-
-    
     def findLanePts(self, im, vis):
             
             poss_pts = {}
@@ -152,8 +106,8 @@ class RoadVision():
     # TBD need to have a function to take an polyfit and find lane with it
     # without using any of the new data- this would allow comparing the old fit
     # to the new, and use the old if it is a lot better.
-    def findLane(self, name, cur2, vis, init_roi, do_plot=True):
-        roi = init_roi
+    def findLane(self, cur2, vis, do_plot=True):
+        roi = self.init_roi
         lane_x = []
         lane_y = []
         yend   = roi[1][1]
@@ -197,7 +151,7 @@ class RoadVision():
                 pf = np.polyfit(lane_y, lane_x, order)
                 p1d = np.poly1d(pf)
             else:
-                p1d = self.p1d[name]
+                p1d = self.p1d
             
             if p1d is not None:
                 #if do_plot:
@@ -238,8 +192,8 @@ class RoadVision():
             # save the current polyfit
             if len(lane_x) > len(xp)/3:
                 #if (self.p1d[name] is None):
-                print name, 'locking on', p1d
-                self.p1d[name] = p1d
+                print self.name, 'locking on', p1d
+                self.p1d = p1d
         if False:
             plt.xlabel('x')
             plt.ylabel('y')
@@ -247,7 +201,66 @@ class RoadVision():
             plt.draw()
             plt.pause(0.01)
 
+
+class RoadVision():
+    
+    def __init__(self, dir_name):
+        
+        if False:
+            self.ox = None
+            self.oy = None
+            self.mx = None
+            self.my = None
+        self.l_button_down = False
+        
+        self.write_images = False
+
+        # currently in half height coords
+        # x1, y2, x2, y2
+        self.lane = {}
+        #self.roi["left"] = ((370, 360), (570, 390))
+        #self.roi["right"] = ((1200, 360), (1400, 390))
+        self.lane["left"]  = Lane("left", ((370, 360), (770, 390)))
+        self.lane["right"] = Lane("right", ((1200, 360), (1600, 390)))
+
+        #self.fourcc = cv2.VideoWriter_fourcc(*'XVID')
+
+        self.out_vid = None
+        self.cap = cv2.VideoCapture(dir_name)
+        ret, self.cur = self.cap.read()
+
+        cv2.namedWindow("image")
+        self.cy = None
+        self.ind = 0
+        cv2.setMouseCallback('image', get_mouse, self)
+
+        plt.ion()
+        plt.show()
+    
+        return
+        
+        # Using live video now and not dir of images
+        ##############################################
+        self.images = {}
+        #for subdir, dirs, files in os.walk(name):
+        #    for fl in sorted(files):
+        for fl in sorted(os.listdir(dir_name)):
+                name = os.path.join(dir_name, fl)
+                im = cv2.imread(name)
+                if im is not None:
+                    print name
+                    self.images[name] = im
+
+                if len(self.images.keys()) > 20:
+                    break
+            #self.im = cv2.imread(name)
+        
+        print 'loaded ', len(self.images.keys()), 'images'
+        #self.overlay = np.zeros(self.im.shape, np.uint8) 
+
     def spin(self):
+        
+        # old markup stuff, not using
         if False:
         #while True:
             if self.l_button_down:
@@ -298,23 +311,36 @@ class RoadVision():
             cur2 = cv2.cvtColor(cur[cur.shape[0]/2 - 100:-100,:], cv2.COLOR_BGR2GRAY)
 
             vis = cv2.cvtColor(cur2, cv2.COLOR_GRAY2BGR)
+            # Tried writing video directly, didn't work and didn't bother
+            # to try anything else, easier to save dir of images
             #if self.out_vid is None:
                 #fourcc =  cv.CV_FOURCC(*'DIVX') #('P','I','M','1')
                 #self.out_vid = cv2.VideoWriter('test.avi', fourcc, 30.0, (vis.shape[0],vis.shape[1]))
 
-            for k in self.roi.keys():
-                self.findLane(k, cur2, vis, self.roi[k])
+            for k in self.lane.keys():
+                self.lane[k].findLane(cur2, vis)
          
             if self.out_vid:
                 self.out_vid.write(vis)
-            name = "image" + str(100000+ ind) + ".jpg"
-            cv2.imwrite(name, vis)
+
+            key = None
             cv2.imshow("image", vis)
-        
-            key = cv2.waitKey(5)
+            if self.write_images:
+                name = "image" + str(100000 + ind) + ".jpg"
+                cv2.imwrite(name, vis)
+            
+                key = cv2.waitKey(5)
+                ret, self.cur = self.cap.read()
+            else: 
+                key = cv2.waitKey(0)
+                if key == ord('n'):
+                    ret, self.cur = self.cap.read()
+                elif key == ord('q'):
+                    break
             #if key != -1:
             #    print key
             num_keys = 1 #len(self.images.keys())
+            
             if False:
                 if key == ord('d'):
                     self.cy += 1
@@ -340,15 +366,13 @@ class RoadVision():
                         for i in range(2):
                             self.roi[k][i][1] += 4
 
-            #elif key == ord('n'):
-            #    ret, self.cur = self.cap.read()
-            elif key == ord('s'):
-                cv2.imwrite("test.png", vis)
-                cv2.imwrite("raw.png", self.cur)
-            elif key == ord('q'):
-                if self.out_vid:
-                    self.out_vid.release();
-                break
+                elif key == ord('s'):
+                    cv2.imwrite("test.png", vis)
+                    cv2.imwrite("raw.png", self.cur)
+                elif key == ord('q'):
+                    if self.out_vid:
+                        self.out_vid.release();
+                    break
 
             ret, self.cur = self.cap.read()
             ind += 1
