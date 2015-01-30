@@ -43,6 +43,10 @@ class Lane():
         self.init_roi = roi
         # all the rois continuing into distance, following the lane marker
         self.rois = {}
+        self.lane_x = None
+        self.lane_y = None
+        self.xp = None
+        self.yp = None
         # the polyfit class
         self.p1d = None
 
@@ -142,7 +146,8 @@ class Lane():
             xp = None
             order = 1
             if len(test_lane_y) > 4:
-                pf, residuals, rank, singular_values, rcond = np.polyfit(test_lane_y, test_lane_x, order, full=True)
+                pf, residuals, rank, singular_values, rcond = \
+                        np.polyfit(test_lane_y, test_lane_x, order, full=True)
                 #print count, 'resid', residuals[0], len(lane_x)
                 if residuals[0] < 500:
                     lane_x = test_lane_x
@@ -197,7 +202,21 @@ class Lane():
                 #if (self.p1d[name] is None):
                 print self.name, 'locking on', p1d
                 self.p1d  = p1d
-                self.rois = rois
+                self.lane_x = lane_x
+                self.lane_y = lane_y
+                self.xp = xp
+                self.yp = yp
+                c2 = 0
+                pad = 30
+                for y in np.arange(np.amax(yp) - 10, np.amin(yp), -10, np.int32):
+                    xrng = xp[ np.logical_and(yp > y, yp < y + 10) ]
+                    xmin = int(np.amin(xrng))
+                    xmax = int(np.amax(xrng))
+                    new_roi = ((xmin - pad, y),  (xmax + pad, y + 10))
+                    #print c2, self.name, new_roi
+                    self.rois[c2] = new_roi 
+                    c2 += 1
+                #self.rois = rois
         if False:
             plt.xlabel('x')
             plt.ylabel('y')
@@ -222,10 +241,8 @@ class RoadVision():
         # currently in half height coords
         # x1, y2, x2, y2
         self.lane = {}
-        #self.roi["left"] = ((370, 360), (570, 390))
-        #self.roi["right"] = ((1200, 360), (1400, 390))
         self.lane["left"]  = Lane("left", ((370, 360), (770, 390)))
-        self.lane["right"] = Lane("right", ((1200, 360), (1600, 390)))
+        #self.lane["right"] = Lane("right", ((1200, 360), (1600, 390)))
 
         #self.fourcc = cv2.VideoWriter_fourcc(*'XVID')
 
