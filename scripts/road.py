@@ -33,6 +33,15 @@ def get_mouse(event, x, y, flags, param):
     if do_print:
         print event, x, y
 
+def visPoints(vis, xp, yp):
+    gi1 = np.logical_and(xp > 1, xp < vis.shape[1]) 
+    gi2 = np.logical_and(yp > 1, yp < vis.shape[0]) 
+    gi = np.logical_and(gi1, gi2)
+    vis[yp[gi].astype(int), xp[gi].astype(int)-1, :] = 0
+    vis[yp[gi].astype(int), xp[gi].astype(int), 0] = 50
+    vis[yp[gi].astype(int), xp[gi].astype(int), 1] = 250
+
+
 # store persistent data for a single lane
 # initial roi and rois from the best most recent lane match
 class Lane():
@@ -49,15 +58,19 @@ class Lane():
         self.yp = None
         # the polyfit class
         self.p1d = None
+        self.lock_ind = -60 
+        self.ind = 0
 
     def findLanePts(self, im, vis):
-            
+            # blur the image vertically some
+            im[:-1,:] = im[:-1,:]/2 + im[1:,:]/2 
+
             poss_pts = {}
             # look for lane markings
             for y in range(im.shape[0]-1, 0, -1):
                 row = im[y,:].astype(int)
                 diff = row[1:] - row[:-1]
-                rises = diff >  12
+                rises = diff >  10
                 drops = diff < -5
                 r2 = np.where(rises)[0]
                 d2 = np.where(drops)[0]
@@ -65,7 +78,7 @@ class Lane():
                 new_pts = []
                 for rise in r2:
                     dr = d2 - rise
-                    matches = np.where( np.logical_and(dr >= 0, dr < 40) )[0]
+                    matches = np.where( np.logical_and(dr >= 0, dr < 50) )[0]
                     for match in matches: #if len(matches) > 0:
                         # start x and half width
                         half_pt_x = rise + dr[match]/2
@@ -86,7 +99,7 @@ class Lane():
                 if len(new_pts) > 5:
                     quality = sorted([a[2] for a in new_pts])
                
-                    med_qual = quality[3*len(quality)/5]
+                    med_qual = quality[4*len(quality)/5]
                     #print 'med quality', med_qual 
                     for pt in new_pts:
                         if pt[2] > med_qual:
@@ -125,13 +138,15 @@ class Lane():
         step = 10
         count = 0
         p1d = None
+        lock_diff = (self.ind - self.lock_ind)
+        #print self.name, self.ind, lock_diff 
         while True:
             rois[count] = roi 
             roi_im1 = cur2[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]]
             roi_pts1 = self.findLanePts(roi_im1, 
                             vis[roi[0][1]:roi[1][1], roi[0][0]:roi[1][0]] )
             #print roi
-            cv2.rectangle(vis, roi[0], roi[1], (255,0,0), 1)
+            cv2.rectangle(vis, roi[0], roi[1], (255 - lock_diff, 3 * lock_diff, 0), 1)
 
             keys = sorted(roi_pts1.keys())
             x1 = [roi_pts1[y][0][0] + roi[0][0] for y in keys]
@@ -149,17 +164,22 @@ class Lane():
             xp = None
             order = 1
             error = None
-            if count > 10:
+            if count > 14:
                 order = 2
             if len(test_lane_y) > 4:
                 pf, residuals, rank, singular_values, rcond = \
                         np.polyfit(test_lane_y, test_lane_x, order, full=True)
                 #print count, 'resid', residuals[0], len(lane_x)
                 error = residuals[0]
-                if residuals[0] < 500:
+                #print error, len(residuals)
+                # not really understanding residuals, seem to be very high
+                # sometimes and very low others
+                if error < 500:
                     lane_x = test_lane_x
                     lane_y = test_lane_y
-                
+                #if (error > 500):
+                #    break
+
             if len(lane_y) > 4:
                 # TBD possible redundant polyfit
                 pf = np.polyfit(lane_y, lane_x, order)
@@ -180,18 +200,10 @@ class Lane():
                     if False:
                         plt.plot(x1,y1, '.')
                         plt.plot(xp,yp)
-                    if False: #error is not None and error < 1.0:
-                        print error
-                        gi1 = np.logical_and(xp > 1, xp < vis.shape[1]) 
-                        gi2 = np.logical_and(yp > 1, yp < vis.shape[0]) 
-                        gi = np.logical_and(gi1, gi2)
-                        vis[yp[gi].astype(int), xp[gi].astype(int)-1, :] = 0
-                        vis[yp[gi].astype(int), xp[gi].astype(int), 0] = 50
-                        vis[yp[gi].astype(int), xp[gi].astype(int), 1] = 250
+                    #visPoints(vis, xp, yp)
             
-            # new roi
             count += 1 
-            if count > 24:
+            if count > 26:
                 break
             if ystart < 0: 
                 break
@@ -202,20 +214,22 @@ class Lane():
                 roi = ((int(np.amin(xp[:step]) - pad), ystart), 
                        (int(np.amax(xp[:step]) + pad), ystart + step))
             else:
-                roi = ((roi[0][0] - 2, ystart), 
-                       (roi[1][0] + 2, ystart + step))
+                roi = ((roi[0][0], ystart), 
+                       (roi[1][0], ystart + step))
        
         if xp is not None:
             #print name, 'num_pts', len(lane_x)
             # save the current polyfit
-            if len(lane_x) > len(xp)/3:
+            threshold = len(xp)/5
+            if len(lane_x) > threshold:
                 #if (self.p1d[name] is None):
-                print self.name, 'locking on' #, p1d
+                #print self.ind, self.name, 'locking on' #, p1d
                 self.p1d  = p1d
                 self.lane_x = lane_x
                 self.lane_y = lane_y
                 self.xp = xp
                 self.yp = yp
+                self.lock_ind = self.ind
                 c2 = 0
                 for y in np.arange(np.amax(yp) - 10, np.amin(yp), -10, np.int32):
                     xrng = xp[ np.logical_and(yp > y, yp < y + 10) ]
@@ -227,13 +241,35 @@ class Lane():
                     self.rois[c2] = new_roi 
                     c2 += 1
                 #self.rois = rois
+            elif lock_diff > 60:
+                self.rois = {}
+                self.p1d = None
         if False:
             plt.xlabel('x')
             plt.ylabel('y')
             plt.gca().invert_yaxis()
             plt.draw()
             plt.pause(0.01)
+       
 
+        if self.p1d:
+            xp2 = self.p1d(yp)
+            #plt.plot(xp2, yp, ms=2.0)
+           
+            visPoints(vis, xp2, yp)
+        
+        if False:
+            plt.plot(lane_x, lane_y, '.', ms=4.0)
+            plt.plot(xp, yp, ms=2.0)
+            plt.gca().invert_yaxis()
+            plt.title(str(len(lane_x)) + ' ' + str(len(xp)) + ' ' + 
+                    str(threshold)  + ', p1d ' + str(p1d) + ', ' + str(self.p1d))
+            plt.xlabel('lane_y')
+            plt.ylabel('lane_x')
+            plt.draw()
+            plt.pause(0.01)
+
+        self.ind += 1
 
 class RoadVision():
     
