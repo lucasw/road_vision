@@ -275,6 +275,7 @@ class RoadVision():
     
     def __init__(self, dir_name):
         
+        self.play = False
         if False:
             self.ox = None
             self.oy = None
@@ -324,7 +325,14 @@ class RoadVision():
         
         print 'loaded ', len(self.images.keys()), 'images'
         #self.overlay = np.zeros(self.im.shape, np.uint8) 
-
+    
+    def advance(self):
+        ret, self.cur = self.cap.read()
+        if self.write_images:
+            name = "image" + str(100000 + self.ind) + ".jpg"
+            cv2.imwrite(name, vis)
+        self.ind += 1
+    
     def spin(self):
         
         # old markup stuff, not using
@@ -349,7 +357,6 @@ class RoadVision():
 
             cv2.imshow("image", comp)
         
-        ind = 0
 
         while True:
             cur = self.cur #self.images[sorted(self.images.keys())[self.ind]] #.copy()
@@ -383,8 +390,8 @@ class RoadVision():
             #if self.out_vid is None:
                 #fourcc =  cv.CV_FOURCC(*'DIVX') #('P','I','M','1')
                 #self.out_vid = cv2.VideoWriter('test.avi', fourcc, 30.0, (vis.shape[0],vis.shape[1]))
-
-            for k in self.lane.keys():
+            
+            if False: #for k in self.lane.keys():
                 self.lane[k].findLane(cur2, vis)
          
             if self.out_vid:
@@ -392,23 +399,31 @@ class RoadVision():
 
             key = None
             cv2.imshow("image", vis)
-            if self.write_images:
-                name = "image" + str(100000 + ind) + ".jpg"
-                cv2.imwrite(name, vis)
-            
+           
+            if self.play:
                 key = cv2.waitKey(5)
-                ret, self.cur = self.cap.read()
+                self.advance()
             else: 
-                key = cv2.waitKey(5)
-                if True: #if key == ord('n'):
-                    ret, self.cur = self.cap.read()
-                elif key == ord('q'):
-                    break
+                key = cv2.waitKey(0)
+            
+            if key == ord('q'):
+                break
             #if key != -1:
             #    print key
-            num_keys = 1 #len(self.images.keys())
-            
+            elif key == ord(' '):
+                self.play = not self.play
+            elif key == ord('j'):
+                self.advance()
+            elif key == ord('s'):
+                name = "vis_save_" + str(100000 + self.ind) + ".jpg"
+                cv2.imwrite(name, vis)
+                print name
+                name = "raw_save_" + str(100000 + self.ind) + ".jpg"
+                cv2.imwrite(name, self.cur)
+
+            # directory of images controls
             if False:
+                num_keys = 1 #len(self.images.keys())
                 if key == ord('d'):
                     self.cy += 1
                     self.cy = self.cy % cur.shape[0]
@@ -441,8 +456,8 @@ class RoadVision():
                         self.out_vid.release();
                     break
 
-            ret, self.cur = self.cap.read()
-            ind += 1
+                ret, self.cur = self.cap.read()
+                ind += 1
 
 comment = '''
 >>> import cv2
