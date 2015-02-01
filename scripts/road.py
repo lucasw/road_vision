@@ -384,13 +384,20 @@ class RoadVision():
             # should make this happen early to reduce resource usage
             cur2 = cv2.cvtColor(cur[cur.shape[0]/2 - 100:-100,:], cv2.COLOR_BGR2GRAY)
 
-            vis = cv2.cvtColor(cur2, cv2.COLOR_GRAY2BGR)
             # Tried writing video directly, didn't work and didn't bother
             # to try anything else, easier to save dir of images
             #if self.out_vid is None:
                 #fourcc =  cv.CV_FOURCC(*'DIVX') #('P','I','M','1')
                 #self.out_vid = cv2.VideoWriter('test.avi', fourcc, 30.0, (vis.shape[0],vis.shape[1]))
+           
+            # test adaptive threshold
+            #print vis.dtype, vis.shape
+            cur3 = cv2.adaptiveThreshold(cur2, 255, cv2.ADAPTIVE_THRESH_MEAN_C, 
+                    cv2.THRESH_BINARY, 7, 0)
             
+            vis = cv2.cvtColor(cur3, cv2.COLOR_GRAY2BGR)
+
+
             if False: #for k in self.lane.keys():
                 self.lane[k].findLane(cur2, vis)
          
