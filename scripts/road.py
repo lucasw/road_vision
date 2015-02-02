@@ -390,10 +390,14 @@ class RoadVision():
                 #fourcc =  cv.CV_FOURCC(*'DIVX') #('P','I','M','1')
                 #self.out_vid = cv2.VideoWriter('test.avi', fourcc, 30.0, (vis.shape[0],vis.shape[1]))
            
+            method = cv2.ADAPTIVE_THRESH_MEAN_C
+            offset = 10
+            sz = 21
+            cur2 = cv2.GaussianBlur(cur2, (3,3), 1 )  #cv2.blur(cur2, (3,3))
+            cur3 = cv2.adaptiveThreshold(cur2, 255, method, cv2.THRESH_BINARY_INV, sz, offset)
+
             # test adaptive threshold
             #print vis.dtype, vis.shape
-            cur3 = cv2.adaptiveThreshold(cur2, 255, cv2.ADAPTIVE_THRESH_MEAN_C, 
-                    cv2.THRESH_BINARY, 7, 0)
             
             vis = cv2.cvtColor(cur3, cv2.COLOR_GRAY2BGR)
 
