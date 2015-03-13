@@ -85,6 +85,7 @@ public:
   Car() {}
 
   void draw(cv::Mat& image);
+  void update();
 
   Edge* cur_edge_;
   float progress_;
@@ -97,6 +98,17 @@ void Car::draw(cv::Mat& image)
   cv::Point2f mid = ap + (bp - ap) * (progress_ / cur_edge_->length_); 
   
   cv::circle(image, mid, 10, cv::Scalar(200,200,200), -1); 
+}
+
+void Car::update()
+{
+  progress_ += 0.5;
+  
+  if (progress_ > cur_edge_->length_)
+  {
+    cur_edge_ = cur_edge_->end_->outputs_[rand() % cur_edge_->end_->outputs_.size()];
+    progress_ = 0;
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -202,10 +214,10 @@ int main(int argn, char** argv)
       all_nodes[i]->draw(image);
     }
 
+    car->update();
     car->draw(image);
 
-    car->progress_ += 0.4;
-   
+
     cv::imshow("road network", image);
     const int key = cv::waitKey(20);
     if (key == 'q') break;
