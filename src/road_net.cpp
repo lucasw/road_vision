@@ -46,21 +46,29 @@ void Node::draw(cv::Mat& image)
 class Edge
 {
 public:
-  Edge(const Node* start, const Node* end, cv::Scalar col);
+  Edge(Node* start, Node* end, cv::Scalar col);
   
   void draw(cv::Mat& image);
-
-  const Node* start_;
-  const Node* end_;
+  
+  float length_;
+  Node* start_;
+  Node* end_;
   cv::Scalar col_;
 };
 
-Edge::Edge(const Node* start, const Node* end, const cv::Scalar col) :
+Edge::Edge(Node* start, Node* end, const cv::Scalar col) :
     start_(start),
     end_(end),
     col_(col)
 {
+  start_->outputs_.push_back(this);
+  end_->inputs_.push_back(this);
+  
+  const float dx = end_->pos_.x - start_->pos_.x;
+  const float dy = end_->pos_.y - start_->pos_.y;
+  length_ = std::sqrt( dx * dx + dy * dy ); 
 }
+
 
 void Edge::draw(cv::Mat& image)
 {
@@ -71,6 +79,27 @@ void Edge::draw(cv::Mat& image)
   cv::line(image, mid, bp, col_ * 0.5, 2); 
 }
 
+class Car
+{
+public:
+  Car() {}
+
+  void draw(cv::Mat& image);
+
+  Edge* cur_edge_;
+  float progress_;
+};
+
+void Car::draw(cv::Mat& image)
+{
+  cv::Point2f ap = cur_edge_->start_->pos_;
+  cv::Point2f bp = cur_edge_->end_->pos_;
+  cv::Point2f mid = ap + (bp - ap) * (progress_ / cur_edge_->length_); 
+  
+  cv::circle(image, mid, 10, cv::Scalar(200,200,200), -1); 
+}
+
+///////////////////////////////////////////////////////////////////////////////
 int main(int argn, char** argv)
 {
   const int wd = 1280;
@@ -157,6 +186,9 @@ int main(int argn, char** argv)
   std::cout << x_num << " " << y_num << " " 
       << all_nodes.size() << " " << all_edges.size() << std::endl;
 
+  Car* car = new Car();
+  car->cur_edge_ = all_edges[rand() % all_edges.size()];
+
   while (true) 
   {
     image = cv::Scalar::all(0);
@@ -169,6 +201,10 @@ int main(int argn, char** argv)
     {
       all_nodes[i]->draw(image);
     }
+
+    car->draw(image);
+
+    car->progress_ += 0.4;
    
     cv::imshow("road network", image);
     const int key = cv::waitKey(20);
