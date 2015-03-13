@@ -68,7 +68,7 @@ void Edge::draw(cv::Mat& image)
   cv::Point2f bp = end_->pos_;
   cv::Point2f mid = ap + (bp - ap) * 0.8; 
   cv::line(image, ap, mid, col_, 1); 
-  cv::line(image, mid, bp, col_ * 0.7, 1); 
+  cv::line(image, mid, bp, col_ * 0.6, 1); 
 }
 
 int main(int argn, char** argv)
@@ -99,32 +99,40 @@ int main(int argn, char** argv)
         // to the west
         size_t ind1 = j * x_num * 4 + i * 4; //all_nodes.size() - 1;
         size_t ind2 = j * x_num * 4 + (i - 1) * 4 + 1;
-        std::cout << "edge " << ind1 << " " << ind2 
-            << " " << all_nodes.size() << std::endl;
         cv::Scalar col = cv::Scalar(255, 100, 50);
         all_edges.push_back(new Edge(all_nodes[ind1], all_nodes[ind2], col));
       }
+      if (j > 0)
+      { 
+        // to the south
+        size_t ind1 = (j - 1) * x_num * 4 + i * 4 + 3; //all_nodes.size() - 1;
+        size_t ind2 = j * x_num * 4 + i * 4;
+        cv::Scalar col = cv::Scalar(105, 150, 190);
+        all_edges.push_back(new Edge(all_nodes[ind1], all_nodes[ind2], col));
+      }
+
 
       all_nodes.push_back(new Node(cv::Point2f(x + off, y)));
 
-      if (false) // ((j > 1))
-      {
+      if (j > 0)
+      { 
         // to the north
-        size_t ind = j * (x_num - 1) + i;
-        size_t ind2 = (j - 1) * (x_num - 1) + i + 1;
-        cv::Scalar col = cv::Scalar(255, 100, 90);
-        all_edges.push_back(new Edge(all_nodes[ind], all_nodes[ind2], col));
+        size_t ind1 = j * x_num * 4 + i * 4 + 1; //all_nodes.size() - 1;
+        size_t ind2 = (j - 1) * x_num * 4 + i * 4 + 2;
+        cv::Scalar col = cv::Scalar(145, 150, 90);
+        all_edges.push_back(new Edge(all_nodes[ind1], all_nodes[ind2], col));
       }
 
       all_nodes.push_back(new Node(cv::Point2f(x + off, y + off))); 
       all_nodes.push_back(new Node(cv::Point2f(x, y + off))); 
     
-      if (false) //(i > 1)
+      if (i > 0)
       { 
-        // to the west
-        size_t ind = all_nodes.size() - 1;
-        cv::Scalar col = cv::Scalar(120, 255, 50);
-        all_edges.push_back(new Edge(all_nodes[ind], all_nodes[ind - 5], col));
+        // to the east
+        size_t ind2 = j * x_num * 4 + i * 4 + 3; //all_nodes.size() - 1;
+        size_t ind1 = j * x_num * 4 + (i - 1) * 4 + 2;
+        cv::Scalar col = cv::Scalar(105, 250, 50);
+        all_edges.push_back(new Edge(all_nodes[ind1], all_nodes[ind2], col));
       }
   
     }
