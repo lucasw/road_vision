@@ -12,6 +12,7 @@
 
 #include <iostream>
 #include <opencv2/highgui/highgui.hpp>
+#include <list>
 #include <map>
 #include <vector>
 
@@ -43,6 +44,8 @@ void Node::draw(cv::Mat& image)
   cv::circle(image, pos_, 4, col, 2); 
 }
 
+class Car;
+
 class Edge
 {
 public:
@@ -53,6 +56,7 @@ public:
   float length_;
   Node* start_;
   Node* end_;
+  std::list<Car*> cars_;
   cv::Scalar col_;
 };
 
@@ -82,10 +86,12 @@ void Edge::draw(cv::Mat& image)
 class Car
 {
 public:
-  Car() {}
+  Car() : max_speed_(1.0) {}
 
   void draw(cv::Mat& image);
   void update();
+  float speed_;
+  const float max_speed_;
 
   Edge* cur_edge_;
   float progress_;
@@ -102,11 +108,17 @@ void Car::draw(cv::Mat& image)
 
 void Car::update()
 {
-  progress_ += 0.5;
+  progress_ += speed_;
+
+  speed_ += 0.01;
+  if (speed_ > max_speed_)
+    speed_ = max_speed_;
   
   if (progress_ > cur_edge_->length_)
   {
+    cur_edge_->cars_.remove(this);
     cur_edge_ = cur_edge_->end_->outputs_[rand() % cur_edge_->end_->outputs_.size()];
+    cur_edge_->cars_.push_back(this);
     progress_ = 0;
   }
 }
@@ -197,9 +209,17 @@ int main(int argn, char** argv)
   }
   std::cout << x_num << " " << y_num << " " 
       << all_nodes.size() << " " << all_edges.size() << std::endl;
+  
+  std::vector<Car*> all_cars;
 
-  Car* car = new Car();
-  car->cur_edge_ = all_edges[rand() % all_edges.size()];
+  const size_t num_cars = 50;
+  for (size_t i = 0; i < num_cars; ++i)
+  {
+    Car* car = new Car();
+    car->cur_edge_ = all_edges[rand() % all_edges.size()];
+    car->cur_edge_->cars_.push_back(car);
+    all_cars.push_back(car);
+  }
 
   while (true) 
   {
@@ -213,10 +233,12 @@ int main(int argn, char** argv)
     {
       all_nodes[i]->draw(image);
     }
-
-    car->update();
-    car->draw(image);
-
+    
+    for (size_t i = 0; i < all_cars.size(); ++i)
+    {
+      all_cars[i]->update();
+      all_cars[i]->draw(image);
+    }
 
     cv::imshow("road network", image);
     const int key = cv::waitKey(20);
