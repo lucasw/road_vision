@@ -40,7 +40,7 @@ Node::Node(cv::Point2f pos) :
 void Node::draw(cv::Mat& image)
 {
   cv::Scalar col = cv::Scalar(255, 240, 10);
-  cv::circle(image, pos_, 4, col); 
+  cv::circle(image, pos_, 4, col, 2); 
 }
 
 class Edge
@@ -66,32 +66,32 @@ void Edge::draw(cv::Mat& image)
 {
   cv::Point2f ap = start_->pos_;
   cv::Point2f bp = end_->pos_;
-  cv::Point2f mid = ap + (bp - ap) * 0.8; 
-  cv::line(image, ap, mid, col_, 1); 
-  cv::line(image, mid, bp, col_ * 0.6, 1); 
+  cv::Point2f mid = ap + (bp - ap) * 0.7; 
+  cv::line(image, ap, mid, col_, 2); 
+  cv::line(image, mid, bp, col_ * 0.5, 2); 
 }
 
 int main(int argn, char** argv)
 {
-  const int wd = 1400;
-  const int ht = 900;
+  const int wd = 1280;
+  const int ht = 720;
   
   cv::Mat image = cv::Mat(cv::Size(wd, ht), CV_8UC3, cv::Scalar::all(0));
 
   std::vector<Node*> all_nodes;
   std::vector<Edge*> all_edges;
 
-  const float div = 150.0;
-  const float off = 20.0;
-  const int x_num = float(wd)/div - 1;
-  const int y_num = float(ht)/div - 1;
+  const float div = 128.0;
+  const float off = 24.0;
+  const int x_num = float(wd)/div;
+  const int y_num = float(ht)/div;
   for (size_t j = 0; j < y_num; ++j)
   {
     for (size_t i = 0; i < x_num; ++i)
     {
       // create an intersection
-      const float x = i * div + div/2.0;
-      const float y = j * div + div/2.0;
+      const float x = i * div + div/2.0 - off/2.0;
+      const float y = j * div + div/2.0 + off/2.0;
       all_nodes.push_back(new Node(cv::Point2f(x, y))); 
       
       if (i > 0)
@@ -134,7 +134,24 @@ int main(int argn, char** argv)
         cv::Scalar col = cv::Scalar(105, 250, 50);
         all_edges.push_back(new Edge(all_nodes[ind1], all_nodes[ind2], col));
       }
-  
+      
+      // connections within intersection
+      {
+        size_t ind = j * x_num * 4 + i * 4 ;
+        // to the east
+        all_edges.push_back(new Edge(all_nodes[ind + 3], all_nodes[ind + 2], 
+            cv::Scalar(105, 250, 150) ));
+        // to the west
+        all_edges.push_back(new Edge(all_nodes[ind + 1], all_nodes[ind], 
+            cv::Scalar(105, 250, 150) ));
+        // to the north
+        all_edges.push_back(new Edge(all_nodes[ind + 2], all_nodes[ind + 1], 
+            cv::Scalar(105, 250, 150) ));
+        // to the south
+        all_edges.push_back(new Edge(all_nodes[ind], all_nodes[ind + 3], 
+            cv::Scalar(105, 250, 150) ));
+
+      }
     }
   }
   std::cout << x_num << " " << y_num << " " 
@@ -143,16 +160,16 @@ int main(int argn, char** argv)
   while (true) 
   {
     image = cv::Scalar::all(0);
-
-    for (size_t i = 0; i < all_nodes.size(); ++i)
-    {
-      all_nodes[i]->draw(image);
-    }
     for (size_t i = 0; i < all_edges.size(); ++i)
     {
       all_edges[i]->draw(image);
     }
-    
+ 
+    for (size_t i = 0; i < all_nodes.size(); ++i)
+    {
+      all_nodes[i]->draw(image);
+    }
+   
     cv::imshow("road network", image);
     const int key = cv::waitKey(20);
     if (key == 'q') break;
