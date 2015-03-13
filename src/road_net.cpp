@@ -97,9 +97,10 @@ int main(int argn, char** argv)
       if (i > 0)
       { 
         // to the west
-        size_t ind1 = j * x_num + i * 4; //all_nodes.size() - 1;
-        size_t ind2 = j * x_num + (i - 1) * 4 + 1;
-        std::cout << ind1 << " " << all_nodes.size() << std::endl;
+        size_t ind1 = j * x_num * 4 + i * 4; //all_nodes.size() - 1;
+        size_t ind2 = j * x_num * 4 + (i - 1) * 4 + 1;
+        std::cout << "edge " << ind1 << " " << ind2 
+            << " " << all_nodes.size() << std::endl;
         cv::Scalar col = cv::Scalar(255, 100, 50);
         all_edges.push_back(new Edge(all_nodes[ind1], all_nodes[ind2], col));
       }
