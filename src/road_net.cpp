@@ -51,6 +51,7 @@ class Edge
 public:
   Edge(Node* start, Node* end, cv::Scalar col);
   
+  bool getNextCar(const Car* car, Car*& next_car, float& min_dist);
   void draw(cv::Mat& image);
   
   float length_;
@@ -72,8 +73,6 @@ Edge::Edge(Node* start, Node* end, const cv::Scalar col) :
   const float dy = end_->pos_.y - start_->pos_.y;
   length_ = std::sqrt( dx * dx + dy * dy ); 
 }
-
-
 void Edge::draw(cv::Mat& image)
 {
   cv::Point2f ap = start_->pos_;
@@ -93,26 +92,79 @@ public:
   float speed_;
   const float max_speed_;
 
+  Car* next_car_;
   Edge* cur_edge_;
   float progress_;
+  cv::Point2f pos_;
 };
+
+// get position of next car
+bool Edge::getNextCar(const Car* car, Car*& next_car, float& min_dist)
+{
+  next_car = NULL;
+
+  for (std::list<Car*>::const_iterator it = cars_.begin();
+      it != cars_.end(); ++it)
+  {
+    if (*it == car) continue;
+    // is car behind?
+    if ((*it)->progress_ <= car->progress_) continue;
+    const float dist = (*it)->progress_ - car->progress_;
+    if ((next_car == NULL) || (dist < min_dist))
+    {
+      min_dist = dist;
+      next_car = *it;
+    }
+  }
+  return (!(next_car == NULL));
+}
 
 void Car::draw(cv::Mat& image)
 {
   cv::Point2f ap = cur_edge_->start_->pos_;
   cv::Point2f bp = cur_edge_->end_->pos_;
-  cv::Point2f mid = ap + (bp - ap) * (progress_ / cur_edge_->length_); 
-  
-  cv::circle(image, mid, 10, cv::Scalar(200,200,200), -1); 
+  pos_ = ap + (bp - ap) * (progress_ / cur_edge_->length_); 
+   
+  cv::circle(image, pos_, 6, cv::Scalar(200,200,200), -1); 
+
+  if (next_car_) 
+  {
+    cv::circle(image, next_car_->pos_, 8, cv::Scalar(0, 0, 255), 1);
+  }
+
 }
 
 void Car::update()
 {
   progress_ += speed_;
 
-  speed_ += 0.01;
+  // find closest car ahead of this car on current road Edge
+  // later search connected road edges, look for cross traffic
+  float dist;
+  cur_edge_->getNextCar(this, next_car_, dist);
+
+
+  const float following_dist = speed_ * 15.0 + 20;
+  if (next_car_ && (dist < following_dist))
+  {
+    //std::cout << this << " " << dist  << " " << following_dist << std::endl; 
+    speed_ -= 0.04;
+  }
+  if (progress_ <= cur_edge_->length_ - 30)
+  {
+    speed_ += 0.01;
+  }  
+  else
+  {
+    speed_ -= 0.03;
+    if (speed_ < 0.45)
+      speed_ = 0.45;
+  }  
+    
   if (speed_ > max_speed_)
     speed_ = max_speed_;
+  if (speed_ < 0.0)
+    speed_ = 0.0;
   
   if (progress_ > cur_edge_->length_)
   {
@@ -121,6 +173,7 @@ void Car::update()
     cur_edge_->cars_.push_back(this);
     progress_ = 0;
   }
+ 
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -134,7 +187,7 @@ int main(int argn, char** argv)
   std::vector<Node*> all_nodes;
   std::vector<Edge*> all_edges;
 
-  const float div = 128.0;
+  const float div = 256.0;
   const float off = 24.0;
   const int x_num = float(wd)/div;
   const int y_num = float(ht)/div;
