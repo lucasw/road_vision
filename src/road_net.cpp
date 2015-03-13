@@ -64,7 +64,11 @@ Edge::Edge(const Node* start, const Node* end, const cv::Scalar col) :
 
 void Edge::draw(cv::Mat& image)
 {
-  cv::line(image, start_->pos_, end_->pos_, col_, 1); 
+  cv::Point2f ap = start_->pos_;
+  cv::Point2f bp = end_->pos_;
+  cv::Point2f mid = ap + (bp - ap) * 0.8; 
+  cv::line(image, ap, mid, col_, 1); 
+  cv::line(image, mid, bp, col_ * 0.7, 1); 
 }
 
 int main(int argn, char** argv)
@@ -77,38 +81,55 @@ int main(int argn, char** argv)
   std::vector<Node*> all_nodes;
   std::vector<Edge*> all_edges;
 
-  const float div = 200.0;
+  const float div = 150.0;
   const float off = 20.0;
-  for (int j = div; j < ht - div; j += div)
+  const int x_num = float(wd)/div - 1;
+  const int y_num = float(ht)/div - 1;
+  for (size_t j = 0; j < y_num; ++j)
   {
-    for (int i = div; i < wd - div; i += div)
+    for (size_t i = 0; i < x_num; ++i)
     {
-      all_nodes.push_back(new Node(cv::Point2f(i, j))); 
+      // create an intersection
+      const float x = i * div + div/2.0;
+      const float y = j * div + div/2.0;
+      all_nodes.push_back(new Node(cv::Point2f(x, y))); 
       
-      int ind = all_nodes.size() - 1;
-      if ((i > div) && (i + div < wd))
+      if (i > 0)
       { 
+        // to the west
+        size_t ind1 = j * x_num + i * 4; //all_nodes.size() - 1;
+        size_t ind2 = j * x_num + (i - 1) * 4 + 1;
+        std::cout << ind1 << " " << all_nodes.size() << std::endl;
         cv::Scalar col = cv::Scalar(255, 100, 50);
-        all_edges.push_back(new Edge(all_nodes[ind - 3], all_nodes[ind], col));
+        all_edges.push_back(new Edge(all_nodes[ind1], all_nodes[ind2], col));
       }
 
-      all_nodes.push_back(new Node(cv::Point2f(i + off, j))); 
+      all_nodes.push_back(new Node(cv::Point2f(x + off, y)));
+
+      if (false) // ((j > 1))
+      {
+        // to the north
+        size_t ind = j * (x_num - 1) + i;
+        size_t ind2 = (j - 1) * (x_num - 1) + i + 1;
+        cv::Scalar col = cv::Scalar(255, 100, 90);
+        all_edges.push_back(new Edge(all_nodes[ind], all_nodes[ind2], col));
+      }
+
+      all_nodes.push_back(new Node(cv::Point2f(x + off, y + off))); 
+      all_nodes.push_back(new Node(cv::Point2f(x, y + off))); 
     
-      all_nodes.push_back(new Node(cv::Point2f(i + off, j + off))); 
-      
-      all_nodes.push_back(new Node(cv::Point2f(i, j + off))); 
-    
-      ind = all_nodes.size() - 1;
-      if ((i > div) && (i + div < wd))
+      if (false) //(i > 1)
       { 
+        // to the west
+        size_t ind = all_nodes.size() - 1;
         cv::Scalar col = cv::Scalar(120, 255, 50);
         all_edges.push_back(new Edge(all_nodes[ind], all_nodes[ind - 5], col));
       }
-
-
   
     }
   }
+  std::cout << x_num << " " << y_num << " " 
+      << all_nodes.size() << " " << all_edges.size() << std::endl;
 
   while (true) 
   {
