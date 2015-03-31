@@ -73,13 +73,20 @@ Edge::Edge(Node* start, Node* end, const cv::Scalar col) :
   const float dy = end_->pos_.y - start_->pos_.y;
   length_ = std::sqrt( dx * dx + dy * dy ); 
 }
+
+void drawLine(cv::Mat& image, cv::Point2f ap, cv::Point2f bp,
+    cv::Scalar col)
+{
+  cv::Point2f mid = ap + (bp - ap) * 0.7; 
+  cv::line(image, ap, mid, col, 2); 
+  cv::line(image, mid, bp, col * 0.5, 2); 
+
+}
 void Edge::draw(cv::Mat& image)
 {
   cv::Point2f ap = start_->pos_;
   cv::Point2f bp = end_->pos_;
-  cv::Point2f mid = ap + (bp - ap) * 0.7; 
-  cv::line(image, ap, mid, col_, 2); 
-  cv::line(image, mid, bp, col_ * 0.5, 2); 
+  drawLine(image, ap, bp, col_);
 }
 
 class Car
@@ -129,6 +136,7 @@ void Car::draw(cv::Mat& image)
 
   if (next_car_) 
   {
+    drawLine(image, pos_, next_car_->pos_, cv::Scalar(40,30,40));
     cv::circle(image, next_car_->pos_, 8, cv::Scalar(0, 0, 255), 1);
   }
 
@@ -144,22 +152,25 @@ void Car::update()
   cur_edge_->getNextCar(this, next_car_, dist);
 
 
-  const float following_dist = speed_ * 15.0 + 20;
+  const float following_dist = speed_ * 35.0 + 50;
   if (next_car_ && (dist < following_dist))
   {
     //std::cout << this << " " << dist  << " " << following_dist << std::endl; 
     speed_ -= 0.04;
   }
-  if (progress_ <= cur_edge_->length_ - 30)
+  else
+  //if (progress_ <= cur_edge_->length_ - 30)
   {
     speed_ += 0.01;
   }  
+  #if 0
   else
   {
     speed_ -= 0.03;
     if (speed_ < 0.45)
       speed_ = 0.45;
   }  
+  #endif
     
   if (speed_ > max_speed_)
     speed_ = max_speed_;
@@ -181,6 +192,7 @@ int main(int argn, char** argv)
 {
   const int wd = 1280;
   const int ht = 720;
+  const size_t num_cars = 10;
   
   cv::Mat image = cv::Mat(cv::Size(wd, ht), CV_8UC3, cv::Scalar::all(0));
 
@@ -265,7 +277,6 @@ int main(int argn, char** argv)
   
   std::vector<Car*> all_cars;
 
-  const size_t num_cars = 50;
   for (size_t i = 0; i < num_cars; ++i)
   {
     Car* car = new Car();
