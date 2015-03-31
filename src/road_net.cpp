@@ -101,6 +101,7 @@ public:
   float speed_;
   const float max_speed_;
 
+  cv::RNG rng_;
   Car* next_car_;
   Edge* cur_edge_;
   float progress_;
@@ -192,15 +193,11 @@ bool Edge::getNextCar(const Car* car,
 
 void Car::draw(cv::Mat& image)
 {
-  cv::Point2f ap = cur_edge_->start_->pos_;
-  cv::Point2f bp = cur_edge_->end_->pos_;
-  pos_ = ap + (bp - ap) * (progress_ / cur_edge_->length_); 
-   
   cv::circle(image, pos_, 6, cv::Scalar(200,200,200), -1); 
 
   if (next_car_) 
   {
-    drawLine(image, pos_, next_car_->pos_, cv::Scalar(40,30,40));
+    drawLine(image, pos_ + cv::Point2f(5.0,0.0), next_car_->pos_, cv::Scalar(80,50,80));
     cv::circle(image, next_car_->pos_, 8, cv::Scalar(0, 0, 255), 1);
   }
 
@@ -209,6 +206,7 @@ void Car::draw(cv::Mat& image)
 void Car::update()
 {
   progress_ += speed_;
+  
 
   // find closest car ahead of this car on current road Edge
   // later search connected road edges, look for cross traffic
@@ -216,11 +214,13 @@ void Car::update()
   std::map<Edge*, float> traversed_edges;
   cur_edge_->getNextCar(this, this->progress_, next_car_, dist, traversed_edges, 0, false);
 
-  const float following_dist = speed_ * 35.0 + 50;
+  const float following_dist = speed_ * 25.0 + 30.0;
   if (next_car_ && (dist < following_dist))
   {
     //std::cout << this << " " << dist  << " " << following_dist << std::endl; 
     speed_ -= 0.04;
+    if ((dist > 20) && (speed_ < 0.1))
+      speed_ = 0.1;
   }
   else
   //if (progress_ <= cur_edge_->length_ - 30)
@@ -240,14 +240,21 @@ void Car::update()
     speed_ = max_speed_;
   if (speed_ < 0.0)
     speed_ = 0.0;
+ 
   
   if (progress_ > cur_edge_->length_)
   {
     cur_edge_->cars_.remove(this);
-    cur_edge_ = cur_edge_->end_->outputs_[rand() % cur_edge_->end_->outputs_.size()];
+    // TODO need to see if edge is one with stopped car, avoid it
+    const size_t edge_ind = rng_.uniform(0, cur_edge_->end_->outputs_.size());
+    cur_edge_ = cur_edge_->end_->outputs_[edge_ind];
     cur_edge_->cars_.push_back(this);
     progress_ = 0;
   }
+  
+  cv::Point2f ap = cur_edge_->start_->pos_;
+  cv::Point2f bp = cur_edge_->end_->pos_;
+  pos_ = ap + (bp - ap) * (progress_ / cur_edge_->length_); 
  
 }
 
@@ -256,7 +263,7 @@ int main(int argn, char** argv)
 {
   const int wd = 1280;
   const int ht = 720;
-  const size_t num_cars = 10;
+  const size_t num_cars = 14;
   
   cv::Mat image = cv::Mat(cv::Size(wd, ht), CV_8UC3, cv::Scalar::all(0));
 
@@ -340,11 +347,17 @@ int main(int argn, char** argv)
       << all_nodes.size() << " " << all_edges.size() << std::endl;
   
   std::vector<Car*> all_cars;
-
+  
+  cv::RNG rng;
   for (size_t i = 0; i < num_cars; ++i)
   {
     Car* car = new Car();
-    car->cur_edge_ = all_edges[rand() % all_edges.size()];
+    const size_t edge_ind = rng.uniform(0, all_edges.size());
+    car->cur_edge_ = all_edges[edge_ind];
+    car->progress_ = rng.uniform(0.0f, car->cur_edge_->length_ * 0.9f);
+    car->update();
+    std::cout << i << " new car " << edge_ind << " " << car->progress_ << " " 
+        << car->pos_ << std::endl;
     car->cur_edge_->cars_.push_back(car);
     all_cars.push_back(car);
   }
