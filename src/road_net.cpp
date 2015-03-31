@@ -241,7 +241,16 @@ void Car::update()
   if (speed_ < 0.0)
     speed_ = 0.0;
  
-  
+  // instead of deciding at the last moment which direction to go,
+  // should decide at beginning of edge and then slow down the car based on the
+  // angle between the next edge and current edge.
+  // This isn't completely robust in the case of dense intersections,
+  // the better solution is to have a destination from start and find the optimal 
+  // route to it and have all decisions ahead of time (then generate a new
+  // destination at once the first is achieved.
+  // Later can reroute in the case of too much traffic
+  // (may even want ability to drive in reverse to get out of dead locks)
+  // Also have lights at intersections.
   if (progress_ > cur_edge_->length_)
   {
     cur_edge_->cars_.remove(this);
