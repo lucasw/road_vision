@@ -51,7 +51,11 @@ class Edge
 public:
   Edge(Node* start, Node* end, cv::Scalar col);
   
-  bool getNextCar(const Car* car, Car*& next_car, float& min_dist);
+  bool getNextCar(const Car* car, const float progress, 
+      Car*& next_car, float& min_dist, 
+      std::map<Edge*, float>& traversed_edges, 
+      const float total_dist,
+      const bool reverse);
   void draw(cv::Mat& image);
   
   float length_;
@@ -69,9 +73,7 @@ Edge::Edge(Node* start, Node* end, const cv::Scalar col) :
   start_->outputs_.push_back(this);
   end_->inputs_.push_back(this);
   
-  const float dx = end_->pos_.x - start_->pos_.x;
-  const float dy = end_->pos_.y - start_->pos_.y;
-  length_ = std::sqrt( dx * dx + dy * dy ); 
+  length_ = cv::norm(end_->pos_ - start_->pos_);
 }
 
 void drawLine(cv::Mat& image, cv::Point2f ap, cv::Point2f bp,
@@ -106,24 +108,86 @@ public:
 };
 
 // get position of next car
-bool Edge::getNextCar(const Car* car, Car*& next_car, float& min_dist)
+bool Edge::getNextCar(const Car* car,
+    const float progress, Car*& next_car, float& min_dist,
+    std::map<Edge*, float>& traversed_edges, const float total_dist,
+    const bool reverse
+    )
 {
   next_car = NULL;
+
+  if (traversed_edges.count(this) > 0)
+    return false;
 
   for (std::list<Car*>::const_iterator it = cars_.begin();
       it != cars_.end(); ++it)
   {
     if (*it == car) continue;
-    // is car behind?
-    if ((*it)->progress_ <= car->progress_) continue;
-    const float dist = (*it)->progress_ - car->progress_;
-    if ((next_car == NULL) || (dist < min_dist))
+    
+    // TBD may want a bi-directional mode
+    if (!reverse)
     {
-      min_dist = dist;
-      next_car = *it;
+      // is car behind?
+      if ((*it)->progress_ <= progress) continue;
+      const float dist = (*it)->progress_ - progress;
+      if ((next_car == NULL) || (dist < min_dist))
+      {
+        min_dist = dist;
+        next_car = *it;
+      }
+    } 
+    else 
+    {
+      if ((*it)->progress_ >= progress) continue;
+      const float dist = progress - (*it)->progress_;
+      if ((next_car == NULL) || (dist < min_dist))
+      {
+        min_dist = dist;
+        next_car = *it;
+      }
     }
   }
-  return (!(next_car == NULL));
+  
+  if (next_car) 
+  { 
+    traversed_edges[this] = total_dist + next_car->progress_ - progress;
+    return true;
+  }
+
+  //
+  const float new_total_dist = total_dist + (cv::norm(end_->pos_ - start_->pos_) - progress); 
+  traversed_edges[this] = new_total_dist;
+ 
+  const float max_dist = 200.0;
+  if (new_total_dist < max_dist)
+  {
+    Car* next_car_2;
+    float dist;
+    for (size_t i = 0; i < end_->inputs_.size(); ++i)
+    { 
+      end_->inputs_[i]->getNextCar(car, end_->inputs_[i]->length_, 
+          next_car_2, dist, traversed_edges, 
+          new_total_dist, true);    
+      if (next_car_2 && ((next_car == NULL) || (new_total_dist + dist < min_dist)))
+      {
+        min_dist = new_total_dist + dist;
+        next_car = next_car_2;
+      }
+    }
+    for (size_t i = 0; i < end_->outputs_.size(); ++i)
+    {
+      end_->outputs_[i]->getNextCar(car, 0, 
+          next_car_2, dist, traversed_edges, 
+          new_total_dist, false);    
+      if (next_car_2 && ((next_car == NULL) || (new_total_dist + dist < min_dist)))
+      {
+        min_dist = new_total_dist + dist;
+        next_car = next_car_2;
+      }
+    }
+  }
+  
+  return (next_car != NULL);
 }
 
 void Car::draw(cv::Mat& image)
@@ -149,8 +213,8 @@ void Car::update()
   // find closest car ahead of this car on current road Edge
   // later search connected road edges, look for cross traffic
   float dist;
-  cur_edge_->getNextCar(this, next_car_, dist);
-
+  std::map<Edge*, float> traversed_edges;
+  cur_edge_->getNextCar(this, this->progress_, next_car_, dist, traversed_edges, 0, false);
 
   const float following_dist = speed_ * 35.0 + 50;
   if (next_car_ && (dist < following_dist))
