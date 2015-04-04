@@ -88,7 +88,8 @@ void Car::draw(cv::Mat& im)
   cv::Rect ob = cv::Rect(pos_ - sz_ * 0.5, pos_ + sz_ * 0.5);
   //std::cout << ob.width << " " << ob.x << std::endl; 
   cv::Scalar col(228, 220, 120);
-  cv::rectangle(im, ob, col, 2, 2);
+  //cv::rectangle(im, ob, col*0.5, 4);
+  cv::rectangle(im, ob, col, 2);
 }
 
 int main(int argn, char** argv)
@@ -104,24 +105,38 @@ int main(int argn, char** argv)
     lanes.push_back(new Lane(y + i * width, width));
   }
 
-  cv::Point2f car_sz(width * 1.5, width * 0.8);
+  cv::Point2f car_sz(width * 1.4, width * 0.7);
   std::vector<Car*> cars;
   const int num_cars = 10;
   for (size_t i = 0; i < num_cars; ++i)
   {
-    cv::Point2f pos(rand() % im.cols, y);
-    const float vel_x = (5.0 * 5280.0 / (60.0 * 60.0)) * pix_per_foot;
-    cv::Point2f vel(vel_x, 0);
+    cv::Point2f pos(-car_sz.x * 1.5, y + rand()%2 * width);
+    cv::Point2f vel(0, 0);
     cars.push_back(new Car(pos, vel, car_sz)); 
   }
 
+  const float vel_x = (10.0 * 5280.0 / (60.0 * 60.0)) * pix_per_foot;
   const float dt = 1.0/30.0;
   while (true)
   {
     im = cv::Scalar::all(5);
+    bool start_clear = true;
     for (size_t i = 0; i < cars.size(); ++i)
     {
       cars[i]->update(dt);
+      if ((cars[i]->pos_.x < 0.0) &&
+          (cars[i]->vel_.x > 0.0))
+      {
+        start_clear = false;
+      }
+
+      // reset a car that has gone off the right side
+      if (cars[i]->pos_.x > im.cols + car_sz.x)
+      {
+        cars[i]->pos_.x = -car_sz.x * 1.5;
+        cars[i]->vel_.x = 0;
+        cars[i]->pos_.y = y + rand()%2 * width;
+      }
       cars[i]->draw(im);
     }
     for (size_t i = 0; i < lanes.size(); ++i)
@@ -132,7 +147,21 @@ int main(int argn, char** argv)
     cv::imshow("n_lanes", im);
     int key = cv::waitKey(50);
     if (key == 'q') break;
-  
-  }
+ 
+    // start one car
+    if (start_clear) 
+    {
+      for (size_t i = 0; i < cars.size(); ++i)
+      {
+        if (cars[i]->pos_.x < 0.0) 
+        {
+          cars[i]->vel_.x = vel_x;
+          //std::cout << "started " << i << " " << vel_x << std::endl;
+          break;
+        } //
+      }
+    }
+
+  }  // update draw loop
 }
 
