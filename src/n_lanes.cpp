@@ -30,7 +30,7 @@ Lane::Lane(float y, float width) :
     y_(y),
     width_(width)
 {
-  std::cout << y_ << " " << width_ << std::endl;
+  std::cout << "Lane " << y_ << " " << width_ << std::endl;
 }
 
 void Lane::draw(cv::Mat& im)
@@ -54,9 +54,45 @@ void Lane::draw(cv::Mat& im)
 
 }
 
+/////////////////////////////////////////////////////////////////
+class Car
+{
+public:
+  Car(cv::Point2f pos, cv::Point2f vel, cv::Point2f sz);
+  
+  void update(const float dt);
+  void draw(cv::Mat& im);
+
+  cv::Point2f pos_;
+  cv::Point2f vel_;
+  cv::Point2f sz_;
+
+};
+
+Car::Car(cv::Point2f pos, cv::Point2f vel, cv::Point2f sz) :
+    pos_(pos),
+    vel_(vel),
+    sz_(sz)
+{
+  std::cout << "Car " << pos_ << vel_ << sz_ << std::endl;
+}
+
+void Car::update(const float dt)
+{
+  pos_ += vel_ * dt;
+
+}
+
+void Car::draw(cv::Mat& im)
+{
+  cv::Rect ob = cv::Rect(pos_ - sz_ * 0.5, pos_ + sz_ * 0.5);
+  //std::cout << ob.width << " " << ob.x << std::endl; 
+  cv::Scalar col(228, 220, 120);
+  cv::rectangle(im, ob, col, 2, 2);
+}
+
 int main(int argn, char** argv)
 {
-
   cv::Mat im = cv::Mat(cv::Size(1280,720), CV_8UC3, cv::Scalar::all(5));
 
   const float pix_per_foot = 5.0;
@@ -68,16 +104,33 @@ int main(int argn, char** argv)
     lanes.push_back(new Lane(y + i * width, width));
   }
 
+  cv::Point2f car_sz(width * 1.5, width * 0.8);
+  std::vector<Car*> cars;
+  const int num_cars = 10;
+  for (size_t i = 0; i < num_cars; ++i)
+  {
+    cv::Point2f pos(rand() % im.cols, y);
+    const float vel_x = (5.0 * 5280.0 / (60.0 * 60.0)) * pix_per_foot;
+    cv::Point2f vel(vel_x, 0);
+    cars.push_back(new Car(pos, vel, car_sz)); 
+  }
+
+  const float dt = 1.0/30.0;
   while (true)
   {
     im = cv::Scalar::all(5);
+    for (size_t i = 0; i < cars.size(); ++i)
+    {
+      cars[i]->update(dt);
+      cars[i]->draw(im);
+    }
     for (size_t i = 0; i < lanes.size(); ++i)
     {
       lanes[i]->draw(im);
     }
 
     cv::imshow("n_lanes", im);
-    int key = cv::waitKey(5);
+    int key = cv::waitKey(50);
     if (key == 'q') break;
   
   }
